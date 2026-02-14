@@ -1,4 +1,14 @@
-"""Streamlit UI components for the accessibility-focused translator interface."""
+"""
+Streamlit UI components for the accessibility-focused translator interface.
+
+ENHANCED FOR HACKATHON PRESENTATION:
+- Clear visual distinction between Normal and Accessibility modes
+- Prominent caption display with smooth animations
+- Real-time status badges for system feedback
+- Comprehensive configuration controls
+- Keyboard shortcuts for power users
+- Responsive layout for all screen sizes
+"""
 
 from __future__ import annotations
 
@@ -11,11 +21,22 @@ import streamlit.components.v1 as components
 
 
 def configure_page() -> None:
+    """
+    Configure Streamlit page with hackathon-ready settings.
+    
+    WHY: Wide layout maximizes screen real estate for video + captions.
+    Collapsed sidebar keeps focus on main content during demos.
+    """
     st.set_page_config(
         page_title="Sign Language Accessibility Translator",
-        page_icon="SL",
+        page_icon="🧏",
         layout="wide",
         initial_sidebar_state="collapsed",
+        menu_items={
+            'Get Help': 'https://github.com/your-repo',
+            'Report a bug': 'https://github.com/your-repo/issues',
+            'About': '# Sign Language Accessibility Translator\nReal-time sign language to text and speech.'
+        }
     )
     apply_accessibility_styles()
 

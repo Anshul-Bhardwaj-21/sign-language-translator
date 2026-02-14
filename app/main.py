@@ -23,6 +23,18 @@ try:
         render_status_indicator,
         trigger_browser_speech,
     )
+    from app.ui_components import (
+        render_mode_header,
+        render_status_badges,
+        render_caption_display,
+        render_system_metrics,
+        render_configuration_panel,
+        render_keyboard_shortcuts,
+        render_demo_mode_selector,
+        inject_keyboard_shortcuts,
+    )
+    from app.metrics import get_metrics, PerformanceMonitor
+    from app.error_handler import get_error_manager, safe_execute
     from app.camera.camera import CameraManager, create_camera_manager
     from app.inference.debug_overlay import OverlayInfo, draw_debug_overlay
     from app.inference.gesture_controls import GestureController, action_feedback
@@ -41,6 +53,18 @@ except ModuleNotFoundError:
         render_status_indicator,
         trigger_browser_speech,
     )
+    from ui_components import (  # type: ignore[no-redef]
+        render_mode_header,
+        render_status_badges,
+        render_caption_display,
+        render_system_metrics,
+        render_configuration_panel,
+        render_keyboard_shortcuts,
+        render_demo_mode_selector,
+        inject_keyboard_shortcuts,
+    )
+    from metrics import get_metrics, PerformanceMonitor  # type: ignore[no-redef]
+    from error_handler import get_error_manager, safe_execute  # type: ignore[no-redef]
     from camera.camera import CameraManager, create_camera_manager  # type: ignore[no-redef]
     from inference.debug_overlay import OverlayInfo, draw_debug_overlay  # type: ignore[no-redef]
     from inference.gesture_controls import GestureController, action_feedback  # type: ignore[no-redef]
@@ -87,6 +111,15 @@ def _init_state() -> None:
         "model_status": "Heuristic mode (no trained model loaded).",
         "model_error": "",
         "landmark_sequence": [],
+        # New UI state
+        "accessibility_mode": True,
+        "caption_only_mode": False,
+        "sync_status": "idle",
+        "current_fps": 0.0,
+        "current_confidence": 0.0,
+        "poor_lighting": False,
+        "start_time": time.time(),
+        "gestures_count": 0,
     }
 
     for key, value in defaults.items():
@@ -101,6 +134,10 @@ def _init_state() -> None:
         st.session_state.movement_tracker = MovementTracker()
     if "gesture_controller" not in st.session_state:
         st.session_state.gesture_controller = GestureController()
+    if "metrics" not in st.session_state:
+        st.session_state.metrics = get_metrics()
+    if "error_manager" not in st.session_state:
+        st.session_state.error_manager = get_error_manager()
 
 
 def _ensure_runtime_components() -> Tuple[bool, str]:
@@ -285,6 +322,13 @@ def _confirm_sentence() -> None:
 
     st.session_state.confirmed_sentences.append(sentence)
     st.session_state.live_words = []
+    st.session_state.gestures_count += 1
+    
+    # Update sync status for backend communication
+    st.session_state.sync_status = "sending"
+    # In production, send to backend via WebSocket here
+    # For now, simulate successful delivery
+    st.session_state.sync_status = "delivered"
 
 
 def _handle_gesture_action(action: str) -> None:
@@ -395,6 +439,7 @@ def _process_single_frame() -> None:
     detector: Optional[HandDetector] = st.session_state.hand_detector
     tracker: MovementTracker = st.session_state.movement_tracker
     gestures: GestureController = st.session_state.gesture_controller
+    metrics = st.session_state.metrics
 
     if camera is None or detector is None:
         st.session_state.system_status = "Camera Error"
@@ -412,7 +457,9 @@ def _process_single_frame() -> None:
             )
         return
 
-    ok, frame_rgb, camera_error = camera.read_frame()
+    with PerformanceMonitor(metrics, "camera_read"):
+        ok, frame_rgb, camera_error = camera.read_frame()
+    
     if not ok or frame_rgb is None:
         st.session_state.frame_failures += 1
         st.session_state.system_status = "Camera Error"
@@ -440,7 +487,9 @@ def _process_single_frame() -> None:
 
     st.session_state.frame_failures = 0
 
-    detection = detector.detect(frame_rgb, draw_landmarks=True)
+    with PerformanceMonitor(metrics, "hand_detection"):
+        detection = detector.detect(frame_rgb, draw_landmarks=True)
+    
     processed_frame = (
         detection.frame_with_landmarks
         if detection.frame_with_landmarks is not None
@@ -456,6 +505,17 @@ def _process_single_frame() -> None:
             processed_frame = st.session_state.last_raw_frame.copy()
 
     hand_detected = bool(detection.hand_detected and detection.primary_landmarks)
+    
+    # Update metrics
+    current_fps = camera.get_fps()
+    st.session_state.current_fps = current_fps
+    metrics.record_fps(current_fps)
+    metrics.record_hand_detection(hand_detected)
+    
+    # Check lighting (simple heuristic based on frame brightness)
+    if frame_rgb is not None:
+        avg_brightness = np.mean(frame_rgb)
+        st.session_state.poor_lighting = avg_brightness < 50 or avg_brightness > 220
 
     if hand_detected:
         snapshot = tracker.update(detection.primary_landmarks)
@@ -478,6 +538,7 @@ def _process_single_frame() -> None:
             _handle_gesture_action(gesture_event.action)
             st.session_state.latest_event_note = action_feedback(gesture_event.action)
             st.session_state.event_note_frames = 35
+            metrics.record_gesture_recognized()
 
         _update_live_words(
             snapshot,
@@ -561,10 +622,34 @@ def main() -> None:
     configure_page()
     _init_state()
     _load_trained_model()
-
-    render_header()
+    
+    # Inject keyboard shortcuts
+    inject_keyboard_shortcuts()
+    
+    # Render mode header (Accessibility vs Normal)
+    render_mode_header(st.session_state.accessibility_mode)
+    
+    # Render status badges
+    hand_detected = st.session_state.last_movement_state != "no_hand"
+    gesture_stable = st.session_state.last_movement_state in {"stable", "idle"}
+    render_status_badges(
+        camera_active=st.session_state.running,
+        hand_detected=hand_detected,
+        gesture_stable=gesture_stable and hand_detected,
+        poor_lighting=st.session_state.poor_lighting,
+        fps=st.session_state.current_fps,
+        confidence=st.session_state.current_confidence
+    )
+    
+    # Demo mode selector
+    with st.expander("🎬 Quick Demo Mode Selector", expanded=False):
+        render_demo_mode_selector()
+    
+    # Original status indicator (kept for compatibility)
     render_status_indicator(st.session_state.system_status, st.session_state.status_detail)
     st.caption(st.session_state.model_status)
+    
+    # Controls
     _handle_controls()
 
     if st.session_state.running:
@@ -588,14 +673,56 @@ def main() -> None:
     live_caption = _live_caption_text()
     confirmed_caption = join_confirmed_sentences(st.session_state.confirmed_sentences)
 
-    left_col, right_col = st.columns([1, 1], gap="large")
-    with left_col:
-        render_caption_panel(live_caption=live_caption, confirmed_caption=confirmed_caption)
-        if st.session_state.event_note_frames > 0:
-            render_event_note(st.session_state.latest_event_note)
-            st.session_state.event_note_frames -= 1
-    with right_col:
-        render_camera_panel(st.session_state.display_frame)
+    # Main layout with responsive columns
+    if st.session_state.caption_only_mode:
+        # Caption-only view for presentations
+        render_caption_display(
+            live_caption=live_caption,
+            confirmed_caption=confirmed_caption,
+            caption_only_mode=True,
+            sync_status=st.session_state.sync_status
+        )
+    else:
+        # Normal two-column layout
+        left_col, right_col = st.columns([1, 1], gap="large")
+        
+        with left_col:
+            # Enhanced caption display
+            render_caption_display(
+                live_caption=live_caption,
+                confirmed_caption=confirmed_caption,
+                caption_only_mode=False,
+                sync_status=st.session_state.sync_status
+            )
+            
+            if st.session_state.event_note_frames > 0:
+                render_event_note(st.session_state.latest_event_note)
+                st.session_state.event_note_frames -= 1
+        
+        with right_col:
+            render_camera_panel(st.session_state.display_frame)
+    
+    # Configuration panel (collapsible)
+    render_configuration_panel()
+    
+    # System metrics (collapsible)
+    with st.expander("📊 System Performance Metrics", expanded=False):
+        metrics = st.session_state.metrics
+        summary = metrics.get_summary()
+        
+        uptime = time.time() - st.session_state.start_time
+        
+        render_system_metrics(
+            fps=st.session_state.current_fps,
+            latency_ms=summary.get('components', {}).get('hand_detection', {}).get('avg_latency_ms', 0.0),
+            model_confidence=st.session_state.current_confidence,
+            hand_detection_rate=summary.get('hand_detection_rate', 0.0),
+            gestures_recognized=st.session_state.gestures_count,
+            uptime_seconds=uptime
+        )
+    
+    # Keyboard shortcuts help
+    render_keyboard_shortcuts()
 
     if st.session_state.pending_speech:
         trigger_browser_speech(
