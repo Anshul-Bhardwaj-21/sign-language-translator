@@ -55,6 +55,54 @@ Known discrepancies / limits
 4. No automated test suite yet for ML pipeline scripts.
    - Add tests before production deployment.
 
+Recent findings (automated codebase check - 2026-02-14)
+------------------------------------------------------
+- Root cause preventing live detection in many dev setups:
+   - `requirements.txt` contained a typo: a line `C>=0.10.8,<0.11` which is invalid.
+      This meant `mediapipe` was not required by the project file and a fresh virtual
+      environment will not have MediaPipe installed by default.
+   - Observed `.venv/Lib/site-packages` only contains `pip` in this workspace,
+      indicating dependencies were not installed in the activated venv.
+
+- Files checked and notes:
+   - `app/main.py` : Correct runtime orchestration logic. The app requires the
+      user to press the `Start` button (or call the Start control) to initialize
+      camera/hand detection. If nothing appears, the usual causes are:
+         * Camera not opened (permissions / another app using it)
+         * MediaPipe not installed (see requirements fix)
+         * Virtual environment not activated or packages not installed
+   - `app/camera/camera.py` : Camera manager implementation is robust and
+      correctly resizes/returns RGB frames.
+   - `app/inference/hand_detector.py` : Correctly validates MediaPipe presence
+      and will raise a clear `RuntimeError` if MediaPipe is not installed.
+   - `app/UI/ui.py` : Displays camera frame from `st.session_state.display_frame`.
+   - `app/UI/video_call_ui.py` : Legacy/alternate UI module — not referenced by
+      `app/main.py`. This file is not used by the current app entrypoint.
+
+- Actions taken:
+   1. Fixed `requirements.txt` to require `mediapipe>=0.10.8,<0.11`.
+   2. Did not modify runtime behavior (app still requires Start) to avoid
+       surprising automatic camera access; recommended next steps are below.
+
+Immediate manual steps to get a working live feed (recommended):
+   - Activate your virtualenv (powershell):
+         & .venv\Scripts\Activate.ps1
+   - Install dependencies:
+         pip install -r requirements.txt
+   - Launch the app from repository root:
+         streamlit run app/main.py
+   - In the web UI press the `Start` button to initialize the camera and hand detector.
+
+If you want me to automatically attempt installing requirements into `.venv` and
+start the app here, tell me and I'll run the installs and a short smoke test.
+
+Recommended follow-ups (optional):
+   - Add a small banner or auto-start toggle in `app/main.py` so that the app can
+      optionally initialize camera on page load for local/dev runs.
+   - Remove or document `app/UI/video_call_ui.py` if it's unused, or wire it into
+      `app/main.py` if intended.
+
+
 Recommended minimum dataset target
 ----------------------------------
 - At least 5-8 labels to start.
