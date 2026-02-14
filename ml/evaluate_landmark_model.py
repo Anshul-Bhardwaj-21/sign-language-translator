@@ -11,7 +11,10 @@ from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 
-from landmark_features import cosine_similarity_matrix, sequence_to_feature_vector
+try:
+    from ml.landmark_features import cosine_similarity_matrix, sequence_to_feature_vector
+except ModuleNotFoundError:
+    from landmark_features import cosine_similarity_matrix, sequence_to_feature_vector  # type: ignore[no-redef]
 
 
 def parse_args() -> argparse.Namespace:

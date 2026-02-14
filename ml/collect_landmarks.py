@@ -88,7 +88,13 @@ def main() -> int:
         print(f"ERROR: {message}")
         return 1
 
-    detector = create_hand_detector(max_num_hands=1)
+    try:
+        detector = create_hand_detector(max_num_hands=1)
+    except Exception as exc:
+        camera.release()
+        print(f"ERROR: Failed to initialize hand detector: {exc}")
+        return 1
+
     tracker = MovementTracker()
 
     saved = 0

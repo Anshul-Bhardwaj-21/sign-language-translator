@@ -12,12 +12,20 @@ from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 
-from landmark_features import (
-    DEFAULT_SEQUENCE_LENGTH,
-    cosine_similarity_matrix,
-    mirror_sequence,
-    sequence_to_feature_vector,
-)
+try:
+    from ml.landmark_features import (
+        DEFAULT_SEQUENCE_LENGTH,
+        cosine_similarity_matrix,
+        mirror_sequence,
+        sequence_to_feature_vector,
+    )
+except ModuleNotFoundError:
+    from landmark_features import (  # type: ignore[no-redef]
+        DEFAULT_SEQUENCE_LENGTH,
+        cosine_similarity_matrix,
+        mirror_sequence,
+        sequence_to_feature_vector,
+    )
 
 
 def parse_args() -> argparse.Namespace:

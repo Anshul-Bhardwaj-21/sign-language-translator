@@ -11,22 +11,41 @@ from typing import List, Optional, Tuple
 import numpy as np
 import streamlit as st
 
-from UI.ui import (
-    configure_page,
-    join_confirmed_sentences,
-    render_camera_panel,
-    render_caption_panel,
-    render_controls,
-    render_event_note,
-    render_header,
-    render_status_indicator,
-    trigger_browser_speech,
-)
-from camera.camera import CameraManager, create_camera_manager
-from inference.debug_overlay import OverlayInfo, draw_debug_overlay
-from inference.gesture_controls import GestureController, action_feedback
-from inference.hand_detector import HandDetector, create_hand_detector
-from inference.movement_tracker import MovementSnapshot, MovementTracker
+try:
+    from app.UI.ui import (
+        configure_page,
+        join_confirmed_sentences,
+        render_camera_panel,
+        render_caption_panel,
+        render_controls,
+        render_event_note,
+        render_header,
+        render_status_indicator,
+        trigger_browser_speech,
+    )
+    from app.camera.camera import CameraManager, create_camera_manager
+    from app.inference.debug_overlay import OverlayInfo, draw_debug_overlay
+    from app.inference.gesture_controls import GestureController, action_feedback
+    from app.inference.hand_detector import HandDetector, create_hand_detector
+    from app.inference.movement_tracker import MovementSnapshot, MovementTracker
+except ModuleNotFoundError:
+    # Fallback for direct execution contexts where `app` is already on sys.path.
+    from UI.ui import (  # type: ignore[no-redef]
+        configure_page,
+        join_confirmed_sentences,
+        render_camera_panel,
+        render_caption_panel,
+        render_controls,
+        render_event_note,
+        render_header,
+        render_status_indicator,
+        trigger_browser_speech,
+    )
+    from camera.camera import CameraManager, create_camera_manager  # type: ignore[no-redef]
+    from inference.debug_overlay import OverlayInfo, draw_debug_overlay  # type: ignore[no-redef]
+    from inference.gesture_controls import GestureController, action_feedback  # type: ignore[no-redef]
+    from inference.hand_detector import HandDetector, create_hand_detector  # type: ignore[no-redef]
+    from inference.movement_tracker import MovementSnapshot, MovementTracker  # type: ignore[no-redef]
 
 
 TARGET_REFRESH_SECONDS = 0.05
@@ -86,10 +105,17 @@ def _init_state() -> None:
 
 def _ensure_runtime_components() -> Tuple[bool, str]:
     if st.session_state.camera is None:
-        st.session_state.camera = create_camera_manager()
+        try:
+            st.session_state.camera = create_camera_manager()
+        except Exception as exc:
+            return False, f"Camera initialization failed: {exc}"
 
     if st.session_state.hand_detector is None:
-        st.session_state.hand_detector = create_hand_detector()
+        try:
+            st.session_state.hand_detector = create_hand_detector()
+        except Exception as exc:
+            st.session_state.hand_detector = None
+            return False, f"Hand detector initialization failed: {exc}"
 
     camera: CameraManager = st.session_state.camera
     if not camera.is_open:

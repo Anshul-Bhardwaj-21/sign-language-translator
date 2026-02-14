@@ -5,16 +5,37 @@ Purpose: Orchestrate complete video call workflow integrating all modules
 
 import threading
 import time
-from typing import Optional, Dict, List
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
-from camera.camera import open_camera, get_frame, release_camera
-from inference.hand_detector import create_hand_detector, detect_hand, extract_landmarks, draw_landmarks
-from inference.movement_tracker import MovementTracker, classify_hand_state, is_hand_idle, is_hand_stable
-from inference.gesture_controls import GestureDetector, detect_control_gesture
-from inference.debug_overlay import DebugInfo, draw_debug_info
-from server.call_manager import CallManager, ParticipantRole
-from server.video_stream_manager import VideoStreamManager, StreamFrame
-from server.messaging import MessageManager, MessageType
+
+try:
+    from app.camera.camera import get_frame, open_camera, release_camera
+    from app.inference.hand_detector import (
+        create_hand_detector,
+        detect_hand,
+        draw_landmarks,
+        extract_landmarks,
+    )
+    from app.inference.movement_tracker import MovementTracker, classify_hand_state
+    from app.inference.gesture_controls import GestureDetector
+    from app.inference.debug_overlay import DebugInfo, draw_debug_info
+    from app.server.call_manager import CallManager
+    from app.server.messaging import MessageManager, MessageType
+    from app.server.video_stream_manager import StreamFrame
+except ModuleNotFoundError:
+    from camera.camera import get_frame, open_camera, release_camera  # type: ignore[no-redef]
+    from inference.hand_detector import (  # type: ignore[no-redef]
+        create_hand_detector,
+        detect_hand,
+        draw_landmarks,
+        extract_landmarks,
+    )
+    from inference.movement_tracker import MovementTracker, classify_hand_state  # type: ignore[no-redef]
+    from inference.gesture_controls import GestureDetector  # type: ignore[no-redef]
+    from inference.debug_overlay import DebugInfo, draw_debug_info  # type: ignore[no-redef]
+    from server.call_manager import CallManager  # type: ignore[no-redef]
+    from server.messaging import MessageManager, MessageType  # type: ignore[no-redef]
+    from server.video_stream_manager import StreamFrame  # type: ignore[no-redef]
 
 
 # ============================================
@@ -96,7 +117,7 @@ class CallSessionManager:
                 participant_id=participant_id,
                 name=name
             )
-            print(f"✓ Local participant initialized: {name}")
+            print(f"Local participant initialized: {name}")
             return True
         
         except Exception as e:
@@ -129,6 +150,8 @@ class CallSessionManager:
             )
             if self.hand_detector is None:
                 print("ERROR: Failed to create hand detector")
+                release_camera(self.local_cap)
+                self.local_cap = None
                 return False
             
             # Initialize movement tracker
@@ -141,10 +164,11 @@ class CallSessionManager:
             )
             
             self.state = SessionState.SETTING_UP
-            print("✓ All modules initialized successfully")
+            print("All modules initialized successfully")
             return True
         
         except Exception as e:
+            self._release_local_resources()
             print(f"ERROR: Failed to initialize modules: {str(e)}")
             return False
     
@@ -167,20 +191,25 @@ class CallSessionManager:
             if self.local_participant is None:
                 print("ERROR: Local participant not initialized")
                 return None
+
+            if (
+                self.local_cap is None
+                or self.hand_detector is None
+                or self.movement_tracker is None
+                or self.gesture_detector is None
+            ):
+                if not self.initialize_modules():
+                    return None
             
             call_id = self.call_manager.start_call(
                 host_id=self.local_participant.participant_id,
                 call_name=call_name,
-                max_participants=max_participants
+                max_participants=max_participants,
+                host_name=self.local_participant.name,
             )
             
             if call_id:
-                # Add local participant to call
-                self.call_manager.add_participant(
-                    participant_id=self.local_participant.participant_id,
-                    name=self.local_participant.name,
-                    role=ParticipantRole.HOST
-                )
+                self.call_manager.activate_call()
                 
                 self.state = SessionState.IN_CALL
                 self.start_time = time.time()
@@ -213,9 +242,7 @@ class CallSessionManager:
                 self.process_thread.join(timeout=5)
             
             # Release resources
-            if self.local_cap:
-                release_camera(self.local_cap)
-                self.local_cap = None
+            self._release_local_resources()
             
             # End call
             success = self.call_manager.end_call()
@@ -268,7 +295,7 @@ class CallSessionManager:
                 action = "unmuted" if self.local_participant.is_audio_enabled else "muted"
                 
                 self.message_manager.send_system_message(
-                    f"🎤 You {action} your microphone"
+                    f"You {action} your microphone"
                 )
                 return True
             return False
@@ -285,7 +312,7 @@ class CallSessionManager:
                 action = "enabled" if self.local_participant.is_video_enabled else "disabled"
                 
                 self.message_manager.send_system_message(
-                    f"📹 You {action} your camera"
+                    f"You {action} your camera"
                 )
                 return True
             return False
@@ -317,6 +344,15 @@ class CallSessionManager:
         
         while self.is_processing and self.state == SessionState.IN_CALL:
             try:
+                if (
+                    self.local_cap is None
+                    or self.hand_detector is None
+                    or self.movement_tracker is None
+                    or self.gesture_detector is None
+                ):
+                    time.sleep(0.02)
+                    continue
+
                 # Get frame from camera
                 ret, frame = get_frame(self.local_cap)
                 if not ret or frame is None:
@@ -328,7 +364,7 @@ class CallSessionManager:
                 hand_detected, detection_results = detect_hand(frame, self.hand_detector)
                 
                 # Extract landmarks
-                landmarks_list, handedness_list = extract_landmarks(detection_results)
+                landmarks_list, _ = extract_landmarks(detection_results)
                 
                 # Track movement
                 if landmarks_list:
@@ -339,7 +375,7 @@ class CallSessionManager:
                 
                 # Detect gesture
                 current_landmarks = landmarks_list[0] if landmarks_list else None
-                gesture, confidence, is_confirmed = self.gesture_detector.detect(current_landmarks)
+                gesture, confidence, _ = self.gesture_detector.detect(current_landmarks)
                 
                 # Get movement state
                 movement_state = classify_hand_state(current_landmarks, self.movement_tracker)
@@ -374,7 +410,7 @@ class CallSessionManager:
                     )
                 
                 # Update gesture every 100 frames
-                if frame_count % 100 == 0 and gesture != "none":
+                if frame_count % 100 == 0 and gesture != "none" and self.local_participant:
                     self.call_manager.update_participant_gesture(
                         self.local_participant.participant_id,
                         gesture
@@ -435,13 +471,28 @@ class CallSessionManager:
         """Register event callback."""
         self.callbacks[event_name] = callback
     
-    def _trigger_callback(self, event_name: str, data: any) -> None:
+    def _trigger_callback(self, event_name: str, data: Any) -> None:
         """Trigger registered callback."""
         try:
             if event_name in self.callbacks:
                 self.callbacks[event_name](data)
         except Exception as e:
             print(f"ERROR: Callback failed: {str(e)}")
+
+    def _release_local_resources(self) -> None:
+        if self.local_cap:
+            release_camera(self.local_cap)
+            self.local_cap = None
+
+        if self.hand_detector:
+            try:
+                self.hand_detector.close()
+            except Exception:
+                pass
+            self.hand_detector = None
+
+        self.movement_tracker = None
+        self.gesture_detector = None
     
     # ============================================
     # CLEANUP
@@ -455,10 +506,11 @@ class CallSessionManager:
             if self.process_thread:
                 self.process_thread.join(timeout=5)
             
-            if self.local_cap:
-                release_camera(self.local_cap)
+            self.call_manager.end_call()
+            self._release_local_resources()
+            self.state = SessionState.IDLE
             
-            print("✓ Session cleaned up")
+            print("Session cleaned up")
         
         except Exception as e:
             print(f"ERROR: Cleanup failed: {str(e)}")

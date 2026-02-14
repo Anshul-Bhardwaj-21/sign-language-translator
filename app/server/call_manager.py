@@ -5,12 +5,15 @@ Purpose: Manage video call sessions, participants, call state, and transitions
 
 import uuid
 import threading
-import time
-from typing import Optional, Dict, List, Tuple
+from typing import Any, Dict, List, Optional
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime
-from server.video_stream_manager import VideoStreamManager, StreamConfig
+
+try:
+    from app.server.video_stream_manager import VideoStreamManager, StreamConfig
+except ModuleNotFoundError:
+    from server.video_stream_manager import VideoStreamManager, StreamConfig  # type: ignore[no-redef]
 
 
 # ============================================
@@ -77,12 +80,12 @@ class Participant:
         """Get participant status string."""
         status = []
         if self.audio_state == MediaState.MUTED:
-            status.append("🔇 Audio muted")
+            status.append("Audio muted")
         if self.video_state == MediaState.DISABLED:
-            status.append("📹 Video off")
+            status.append("Video off")
         if self.is_screen_sharing:
-            status.append("📺 Sharing screen")
-        return " | ".join(status) if status else "✓ Active"
+            status.append("Sharing screen")
+        return " | ".join(status) if status else "Active"
 
 
 @dataclass
@@ -129,7 +132,13 @@ class CallManager:
     # CALL LIFECYCLE
     # ============================================
     
-    def start_call(self, host_id: str, call_name: str, max_participants: int = 10) -> Optional[str]:
+    def start_call(
+        self,
+        host_id: str,
+        call_name: str,
+        max_participants: int = 10,
+        host_name: Optional[str] = None,
+    ) -> Optional[str]:
         """
         Start a new video call.
         
@@ -137,6 +146,7 @@ class CallManager:
             host_id: ID of call host
             call_name: Name/title of call
             max_participants: Maximum participants allowed
+            host_name: Optional display name for host participant
         
         Returns:
             Call ID if successful, None otherwise
@@ -157,14 +167,27 @@ class CallManager:
                 self.current_call.state = CallState.WAITING
                 
                 # Add host as participant
+                resolved_host_name = host_name.strip() if host_name and host_name.strip() else f"Host ({host_id[:8]})"
                 self.participants[host_id] = Participant(
                     participant_id=host_id,
-                    name=f"Host ({host_id[:8]})",
+                    name=resolved_host_name,
                     role=ParticipantRole.HOST,
                     joined_at=datetime.now()
                 )
+
+                # Ensure host has an active stream immediately.
+                host_stream_config = StreamConfig(
+                    participant_id=host_id,
+                    width=640,
+                    height=480,
+                    fps=30,
+                )
+                if not self.stream_manager.create_stream(host_stream_config):
+                    self.participants.pop(host_id, None)
+                    self.current_call = None
+                    return None
                 
-                print(f"✓ Call started: {call_id}")
+                print(f"Call started: {call_id}")
                 self._trigger_event("call_started", call_id)
                 return call_id
         
@@ -198,7 +221,7 @@ class CallManager:
                 self.current_call = None
                 self.participants.clear()
                 
-                print(f"✓ Call ended: {call_id}")
+                print(f"Call ended: {call_id}")
                 self._trigger_event("call_ended", call_id)
                 return True
         
@@ -277,7 +300,7 @@ class CallManager:
                 )
                 self.stream_manager.create_stream(config)
                 
-                print(f"✓ Participant added: {name} ({participant_id})")
+                print(f"Participant added: {name} ({participant_id})")
                 self._trigger_event("participant_joined", participant_id)
                 return True
         
@@ -306,7 +329,7 @@ class CallManager:
                 # Remove participant
                 del self.participants[participant_id]
                 
-                print(f"✓ Participant removed: {participant_id}")
+                print(f"Participant removed: {participant_id}")
                 self._trigger_event("participant_left", participant_id)
                 return True
         
@@ -488,7 +511,7 @@ class CallManager:
     # EVENTS
     # ============================================
     
-    def _trigger_event(self, event_name: str, data: any) -> None:
+    def _trigger_event(self, event_name: str, data: Any) -> None:
         """Trigger registered event callback."""
         try:
             if event_name in self.event_callbacks:

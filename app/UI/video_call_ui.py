@@ -4,7 +4,7 @@ Purpose: Streamlit UI components for video calling interface
 """
 
 import streamlit as st
-from typing import Optional, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 # ============================================
@@ -94,7 +94,7 @@ def render_participants_panel(participants: List) -> None:
 # VIDEO DISPLAY
 # ============================================
 
-def render_video_grid(frames: Dict[str, any], columns: int = 2) -> None:
+def render_video_grid(frames: Dict[str, Any], columns: int = 2) -> None:
     """
     Render video feed grid.
     
@@ -256,7 +256,10 @@ def render_chat_panel(call_manager, message_manager) -> None:
         with col2:
             if st.button("📤 Send", use_container_width=True):
                 if message_input:
-                    from server.messaging import MessageType
+                    try:
+                        from app.server.messaging import MessageType
+                    except ModuleNotFoundError:
+                        from server.messaging import MessageType  # type: ignore[no-redef]
                     message_manager.send_message(
                         message_id="msg_" + str(hash(message_input))[:8],
                         sender_id="local_user",
@@ -280,7 +283,10 @@ def render_chat_panel(call_manager, message_manager) -> None:
             col = [col1, col2, col3][idx % 3]
             with col:
                 if st.button(label, use_container_width=True):
-                    from server.messaging import MessageType
+                    try:
+                        from app.server.messaging import MessageType
+                    except ModuleNotFoundError:
+                        from server.messaging import MessageType  # type: ignore[no-redef]
                     message_manager.send_message(
                         message_id="quick_" + str(hash(label))[:8],
                         sender_id="local_user",

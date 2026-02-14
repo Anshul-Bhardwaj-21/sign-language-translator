@@ -6,8 +6,12 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Sequence, Tuple
 
 import cv2
-import mediapipe as mp
 import numpy as np
+
+try:
+    import mediapipe as mp
+except Exception:  # pragma: no cover - handled explicitly at runtime.
+    mp = None  # type: ignore[assignment]
 
 
 Landmark = Tuple[float, float, float]
@@ -35,9 +39,21 @@ class HandDetector:
         min_detection_confidence: float = 0.6,
         min_tracking_confidence: float = 0.5,
     ) -> None:
-        self._mp_hands = mp.solutions.hands
-        self._mp_drawing = mp.solutions.drawing_utils
-        self._mp_drawing_styles = mp.solutions.drawing_styles
+        if mp is None:
+            raise RuntimeError(
+                "MediaPipe is not installed. Install dependencies from requirements.txt."
+            )
+
+        solutions = getattr(mp, "solutions", None)
+        if solutions is None or not hasattr(solutions, "hands"):
+            raise RuntimeError(
+                "MediaPipe install is missing Hands solutions API. "
+                "Reinstall with `pip install mediapipe>=0.10.8,<0.11`."
+            )
+
+        self._mp_hands = solutions.hands
+        self._mp_drawing = solutions.drawing_utils
+        self._mp_drawing_styles = solutions.drawing_styles
         self._hands = self._mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=max_num_hands,

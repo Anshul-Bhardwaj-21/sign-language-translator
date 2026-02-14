@@ -4,7 +4,7 @@ Purpose: Handle text messaging and chat during video calls
 """
 
 import time
-from typing import List, Optional, Dict
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -213,7 +213,7 @@ class MessageManager:
             # Trigger callback
             self._trigger_callback("message_sent", message)
             
-            print(f"✓ Message sent from {sender_name}")
+            print(f"Message sent from {sender_name}")
             return True
         
         except Exception as e:
@@ -334,7 +334,7 @@ class MessageManager:
         import uuid
         return str(uuid.uuid4())[:8]
     
-    def _trigger_callback(self, callback_name: str, data: any) -> None:
+    def _trigger_callback(self, callback_name: str, data: Any) -> None:
         """Trigger registered callback."""
         try:
             if callback_name in self.message_callbacks:

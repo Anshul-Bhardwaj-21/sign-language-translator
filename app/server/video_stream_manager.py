@@ -8,7 +8,7 @@ import queue
 import time
 import numpy as np
 import cv2
-from typing import Optional, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -191,7 +191,7 @@ class VideoStreamManager:
                 stream.is_active = True
                 self.streams[config.participant_id] = stream
                 
-                print(f"✓ Stream created for {config.participant_id}")
+                print(f"Stream created for {config.participant_id}")
                 self._trigger_event("stream_created", config.participant_id)
                 return True
         
@@ -219,7 +219,7 @@ class VideoStreamManager:
                 stream.clear_buffer()
                 del self.streams[participant_id]
                 
-                print(f"✓ Stream removed for {participant_id}")
+                print(f"Stream removed for {participant_id}")
                 self._trigger_event("stream_removed", participant_id)
                 return True
         
@@ -319,7 +319,7 @@ class VideoStreamManager:
         except:
             return {}
     
-    def _trigger_event(self, event_name: str, data: any) -> None:
+    def _trigger_event(self, event_name: str, data: Any) -> None:
         """Trigger registered event callback."""
         try:
             if event_name in self.event_callbacks:
