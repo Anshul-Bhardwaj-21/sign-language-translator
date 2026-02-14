@@ -30,8 +30,7 @@ def test_camera_manager_custom_config():
     assert manager.config.target_fps == 30
 
 
-@pytest.mark.skipif(not pytest.config.getoption("--run-camera-tests"),
-                    reason="Camera tests require physical camera")
+@pytest.mark.skip(reason="Requires physical camera")
 def test_camera_open():
     """Test camera opening (requires physical camera)."""
     manager = CameraManager()
@@ -46,8 +45,7 @@ def test_camera_open():
         assert "unable" in message.lower() or "permission" in message.lower()
 
 
-@pytest.mark.skipif(not pytest.config.getoption("--run-camera-tests"),
-                    reason="Camera tests require physical camera")
+@pytest.mark.skip(reason="Requires physical camera")
 def test_camera_read_frame():
     """Test frame reading (requires physical camera)."""
     manager = CameraManager()
