@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+   PRODUCTION-GRADE ACCESSIBILITY & UX STYLES
+   ============================================================================ */
+
 * {
   margin: 0;
   padding: 0;
@@ -19,4 +23,240 @@ body {
 #root {
   width: 100%;
   height: 100vh;
+}
+
+/* ============================================================================
+   ACCESSIBILITY: Focus Indicators (WCAG 2.1 AA)
+   ============================================================================ */
+
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* High contrast focus for accessibility mode */
+.accessibility-mode button:focus-visible {
+  outline: 4px solid #fbbf24;
+  outline-offset: 3px;
+}
+
+/* ============================================================================
+   BUTTON STATES: Proper Interactive Feedback
+   ============================================================================ */
+
+button {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* ============================================================================
+   VIDEO ELEMENTS: Proper Rendering
+   ============================================================================ */
+
+video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* Mirror effect for selfie view */
+video.mirror {
+  transform: scaleX(-1);
+}
+
+/* ============================================================================
+   LOADING STATES: Smooth Transitions
+   ============================================================================ */
+
+.loading-spinner {
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   CAPTION ANIMATIONS: Smooth Entry/Exit
+   ============================================================================ */
+
+.caption-enter {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.caption-exit {
+  animation: slideDown 0.2s ease-in;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+/* ============================================================================
+   HIGH CONTRAST MODE: WCAG AAA Compliance
+   ============================================================================ */
+
+.high-contrast {
+  --text-primary: #ffffff;
+  --text-secondary: #e5e7eb;
+  --bg-primary: #000000;
+  --bg-secondary: #1a1a1a;
+  --accent: #60a5fa;
+  --error: #ef4444;
+  --success: #10b981;
+}
+
+/* ============================================================================
+   SCREEN READER ONLY: Accessibility Labels
+   ============================================================================ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================================================
+   KEYBOARD NAVIGATION: Visual Indicators
+   ============================================================================ */
+
+.keyboard-nav button:focus,
+.keyboard-nav input:focus,
+.keyboard-nav a:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+/* ============================================================================
+   RESPONSIVE: Mobile Optimizations
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  /* Larger touch targets for mobile */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Adjust video aspect ratio for mobile */
+  video {
+    object-fit: cover;
+  }
+}
+
+/* ============================================================================
+   REDUCED MOTION: Respect User Preferences
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES: Clean Print Output
+   ============================================================================ */
+
+@media print {
+  video,
+  button,
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ============================================================================
+   CUSTOM SCROLLBAR: Better UX
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* ============================================================================
+   ERROR STATES: Clear Visual Feedback
+   ============================================================================ */
+
+.error-shake {
+  animation: shake 0.5s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* ============================================================================
+   SUCCESS STATES: Positive Feedback
+   ============================================================================ */
+
+.success-pulse {
+  animation: pulse 0.5s;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
