@@ -68,7 +68,7 @@ export default function VideoCallPage() {
   // Refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const frameCaptureManagerRef = useRef<FrameCaptureManager | null>(null);
-  const userIdRef = useRef(displayName ? `${displayName}_${Math.random().toString(36).substr(2, 9)}` : 'user_' + Math.random().toString(36).substr(2, 9));
+  const userIdRef = useRef(displayName ? `${displayName}_${Math.random().toString(36).substring(2, 11)}` : 'user_' + Math.random().toString(36).substring(2, 11));
   const captionHistoryRef = useRef<HTMLDivElement>(null);
 
   /**
