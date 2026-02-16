@@ -9,6 +9,7 @@ export class FrameCaptureManager {
   private userId: string;
   private sessionId: string;
   private isRunning: boolean = false;
+  private rafId: number | null = null;  // Track animation frame ID for cleanup
 
   constructor(userId: string, sessionId: string) {
     this.canvas = document.createElement('canvas');
@@ -65,14 +66,17 @@ export class FrameCaptureManager {
     this.isRunning = true;
 
     const processLoop = async () => {
-      if (!this.isRunning) return;
+      if (!this.isRunning) {
+        this.rafId = null;  // Clear RAF ID when stopping
+        return;
+      }
 
       const result = await this.processFrame(videoElement);
       if (result) {
         onResult(result);
       }
 
-      requestAnimationFrame(processLoop);
+      this.rafId = requestAnimationFrame(processLoop);  // Store RAF ID
     };
 
     processLoop();
@@ -80,5 +84,15 @@ export class FrameCaptureManager {
 
   stopProcessing(): void {
     this.isRunning = false;
+    
+    // Cancel any pending animation frame
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    
+    // Clean up canvas to free memory
+    this.canvas.width = 0;
+    this.canvas.height = 0;
   }
 }

@@ -73,6 +73,10 @@ export const api = {
   },
 
   async processFrame(frame: string, userId: string, sessionId: string): Promise<MLResult> {
+    // Manual timeout implementation for browser compatibility
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/ml/process-frame`, {
         method: 'POST',
@@ -83,8 +87,10 @@ export const api = {
           session_id: sessionId,
           timestamp: Date.now() / 1000
         }),
-        signal: AbortSignal.timeout(5000)
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);  // Clear timeout on success
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -92,6 +98,8 @@ export const api = {
 
       return await response.json();
     } catch (error) {
+      clearTimeout(timeoutId);  // Clear timeout on error
+      
       console.error('ML processing failed:', error);
       return {
         success: false,

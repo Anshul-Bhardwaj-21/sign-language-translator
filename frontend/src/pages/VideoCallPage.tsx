@@ -21,6 +21,7 @@ import { MLResult } from '../services/api';
 
 // Types for better type safety
 interface LocationState {
+  displayName?: string;        // New: User's display name
   cameraEnabled?: boolean;
   micEnabled?: boolean;
   accessibilityMode?: boolean;
@@ -38,6 +39,9 @@ export default function VideoCallPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state as LocationState) || {};
+  
+  // User session state
+  const [displayName] = useState(state.displayName || 'Anonymous User');
   
   // Media states
   const [cameraEnabled, setCameraEnabled] = useState(state.cameraEnabled || false);
@@ -64,18 +68,21 @@ export default function VideoCallPage() {
   // Refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const frameCaptureManagerRef = useRef<FrameCaptureManager | null>(null);
-  const userIdRef = useRef('user_' + Math.random().toString(36).substr(2, 9));
+  const userIdRef = useRef(displayName ? `${displayName}_${Math.random().toString(36).substring(2, 11)}` : 'user_' + Math.random().toString(36).substring(2, 11));
   const captionHistoryRef = useRef<HTMLDivElement>(null);
+  const initializingRef = useRef(false);  // Prevent concurrent camera initialization
 
   /**
    * FIX #1: Robust Camera Initialization
    * - Multiple fallback constraints
    * - Proper error handling
    * - Loading states
+   * - Race condition prevention
    */
   const initializeCamera = useCallback(async () => {
-    if (!cameraEnabled) return;
+    if (!cameraEnabled || initializingRef.current) return;  // Prevent concurrent calls
     
+    initializingRef.current = true;  // Lock initialization
     setIsLoadingCamera(true);
     setCameraError('');
 
@@ -117,6 +124,7 @@ export default function VideoCallPage() {
         }
         
         setIsLoadingCamera(false);
+        initializingRef.current = false;  // Unlock on success
         return; // Success!
       } catch (err) {
         console.log('Camera attempt failed:', err);
@@ -128,6 +136,7 @@ export default function VideoCallPage() {
     setCameraError('Could not access camera. Please check permissions or close other apps using the camera.');
     setIsLoadingCamera(false);
     setCameraEnabled(false);
+    initializingRef.current = false;  // Unlock on failure
   }, [cameraEnabled]);
 
   /**
@@ -463,6 +472,9 @@ export default function VideoCallPage() {
         aria-label="Meeting status"
       >
         <div className="flex gap-6 text-sm text-gray-300">
+          <span aria-label={`Participant: ${displayName}`}>
+            👤 {displayName}
+          </span>
           <span aria-label={`Frame rate: ${fps.toFixed(1)} frames per second`}>
             📊 FPS: {fps.toFixed(1)}
           </span>

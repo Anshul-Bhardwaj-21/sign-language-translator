@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera Test - Sign Language App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        video {
+            width: 100%;
+            max-width: 640px;
+            background: black;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .error {
+            background: #f44336;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #4CAF50;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            background: #2196F3;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        #log {
+            background: #333;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎥 Camera Diagnostic Tool</h1>
+    <p>This tool will help diagnose camera issues</p>
+
+    <div id="status"></div>
+    
+    <video id="video" autoplay playsinline muted></video>
+    
+    <div>
+        <button onclick="testCamera()">Test Camera</button>
+        <button onclick="listDevices()">List Devices</button>
+        <button onclick="stopCamera()">Stop Camera</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div id="log"></div>
+
+    <script>
+        let stream = null;
+        const video = document.getElementById('video');
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.textContent = `[${timestamp}] ${message}`;
+            entry.style.color = type === 'error' ? '#f44336' : type === 'success' ? '#4CAF50' : 'white';
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function showStatus(message, type = 'info') {
+            statusDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function clearLog() {
+            logDiv.innerHTML = '';
+        }
+
+        async function listDevices() {
+            try {
+                log('Listing all media devices...');
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                const audioDevices = devices.filter(d => d.kind === 'audioinput');
+                
+                log(`Found ${videoDevices.length} camera(s)`, 'success');
+                videoDevices.forEach((device, i) => {
+                    log(`  Camera ${i + 1}: ${device.label || 'Unknown'} (${device.deviceId.substring(0, 20)}...)`);
+                });
+                
+                log(`Found ${audioDevices.length} microphone(s)`, 'success');
+                audioDevices.forEach((device, i) => {
+                    log(`  Mic ${i + 1}: ${device.label || 'Unknown'} (${device.deviceId.substring(0, 20)}...)`);
+                });
+                
+                if (videoDevices.length === 0) {
+                    showStatus('❌ No cameras found!', 'error');
+                } else {
+                    showStatus(`✅ Found ${videoDevices.length} camera(s)`, 'success');
+                }
+            } catch (err) {
+                log(`Error listing devices: ${err.message}`, 'error');
+                showStatus(`❌ Error: ${err.message}`, 'error');
+            }
+        }
+
+        async function testCamera() {
+            log('Starting camera test...');
+            
+            // Stop any existing stream
+            if (stream) {
+                stopCamera();
+            }
+
+            const constraints = [
+                { video: { facingMode: 'user' }, audio: false },
+                { video: true, audio: false },
+                { video: { width: 640, height: 480 }, audio: false },
+                { video: { width: 320, height: 240 }, audio: false }
+            ];
+
+            for (let i = 0; i < constraints.length; i++) {
+                try {
+                    log(`Attempt ${i + 1}: Trying constraints: ${JSON.stringify(constraints[i])}`);
+                    stream = await navigator.mediaDevices.getUserMedia(constraints[i]);
+                    
+                    video.srcObject = stream;
+                    await video.play();
+                    
+                    const tracks = stream.getVideoTracks();
+                    if (tracks.length > 0) {
+                        const settings = tracks[0].getSettings();
+                        log(`✅ Camera started successfully!`, 'success');
+                        log(`  Resolution: ${settings.width}x${settings.height}`);
+                        log(`  Frame rate: ${settings.frameRate} fps`);
+                        log(`  Device: ${tracks[0].label}`);
+                        showStatus('✅ Camera is working!', 'success');
+                        return;
+                    }
+                } catch (err) {
+                    log(`Attempt ${i + 1} failed: ${err.name} - ${err.message}`, 'error');
+                    
+                    if (err.name === 'NotAllowedError') {
+                        showStatus('❌ Camera permission denied. Click the lock icon in address bar and allow camera.', 'error');
+                    } else if (err.name === 'NotFoundError') {
+                        showStatus('❌ No camera found on this device.', 'error');
+                    } else if (err.name === 'NotReadableError') {
+                        showStatus('❌ Camera is in use by another application. Close other apps and try again.', 'error');
+                    } else {
+                        showStatus(`❌ Error: ${err.message}`, 'error');
+                    }
+                }
+            }
+            
+            log('All attempts failed', 'error');
+        }
+
+        function stopCamera() {
+            if (stream) {
+                log('Stopping camera...');
+                stream.getTracks().forEach(track => {
+                    track.stop();
+                    log(`  Stopped track: ${track.label}`);
+                });
+                video.srcObject = null;
+                stream = null;
+                showStatus('Camera stopped', 'info');
+            } else {
+                log('No active camera to stop');
+            }
+        }
+
+        // Auto-run device list on load
+        window.onload = () => {
+            log('Camera diagnostic tool loaded');
+            log('Click "List Devices" to see available cameras');
+            log('Click "Test Camera" to test camera access');
+            listDevices();
+        };
+
+        // Cleanup on page unload
+        window.onbeforeunload = () => {
+            stopCamera();
+        };
+    </script>
+</body>
+</html>
