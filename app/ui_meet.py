@@ -363,6 +363,62 @@ def inject_meet_styles() -> None:
             gap: 12px;
         }
     }
+    
+    /* ===== LOBBY STYLING ===== */
+    /* Lobby-specific styles for pre-join screen */
+    .stTextInput > div > div > input {
+        background-color: #3c4043 !important;
+        border: 1px solid #5f6368 !important;
+        border-radius: 8px !important;
+        color: #e8eaed !important;
+        padding: 12px 16px !important;
+        font-size: 1rem !important;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #8ab4f8 !important;
+        box-shadow: 0 0 0 1px #8ab4f8 !important;
+    }
+    
+    .stTextInput > div > div > input::placeholder {
+        color: #9aa0a6 !important;
+    }
+    
+    /* Primary button styling for Join Meeting */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #1a73e8, #4285f4) !important;
+        border: none !important;
+        border-radius: 24px !important;
+        color: white !important;
+        font-weight: 500 !important;
+        font-size: 1rem !important;
+        padding: 12px 32px !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3) !important;
+    }
+    
+    .stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #1557b0, #3367d6) !important;
+        box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4) !important;
+        transform: translateY(-1px) !important;
+    }
+    
+    .stButton > button[kind="primary"]:disabled {
+        background: #3c4043 !important;
+        color: #5f6368 !important;
+        box-shadow: none !important;
+        transform: none !important;
+    }
+    
+    /* Checkbox styling for accessibility preview */
+    .stCheckbox > label {
+        color: #9aa0a6 !important;
+    }
+    
+    .stCheckbox > label > div[data-testid="stCheckbox"] > div {
+        background-color: #3c4043 !important;
+        border-color: #5f6368 !important;
+    }
     </style>
     """
     
@@ -757,6 +813,8 @@ def render_advanced_settings() -> None:
 def init_meet_ui_state() -> None:
     """Initialize Meet-style UI specific session state variables."""
     meet_defaults = {
+        "meeting_state": "LOBBY",  # Start in lobby
+        "room_code": "",
         "video_needs_update": True,
         "ui_state_changed": False,
         "last_stable_frame": None,
@@ -900,6 +958,84 @@ def get_current_state(context: str) -> str:
     return "UNKNOWN"
 
 
+def render_meeting_lobby() -> None:
+    """
+    Render the meeting lobby screen with room code input and join button.
+    
+    This screen appears before the main Meet UI and does not initialize
+    camera or runtime components.
+    """
+    # Center the lobby content
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        # App title with icon
+        st.markdown("""
+        <div style="text-align: center; margin-bottom: 3rem;">
+            <h1 style="color: #e8eaed; font-size: 2.5rem; margin-bottom: 0.5rem;">
+                🤟 Sign Language Video Call
+            </h1>
+            <p style="color: #9aa0a6; font-size: 1.1rem;">
+                Join a meeting to start translating sign language
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Room code input
+        st.markdown("""
+        <div style="margin-bottom: 2rem;">
+            <label style="color: #e8eaed; font-size: 1rem; margin-bottom: 0.5rem; display: block;">
+                Meeting Room Code
+            </label>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        room_code = st.text_input(
+            "Meeting Room Code",
+            value=st.session_state.get('room_code', ''),
+            placeholder="Enter room code (e.g., abc-def-ghi)",
+            key="room_code_input",
+            label_visibility="collapsed"
+        )
+        
+        # Update session state
+        st.session_state.room_code = room_code
+        
+        # Join button
+        st.markdown("<div style='margin-top: 2rem;'>", unsafe_allow_html=True)
+        
+        join_disabled = not room_code.strip()
+        
+        if st.button(
+            "Join Meeting",
+            disabled=join_disabled,
+            use_container_width=True,
+            type="primary"
+        ):
+            # Set meeting state to IN_CALL and trigger rerun
+            st.session_state.meeting_state = "IN_CALL"
+            st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Accessibility toggle (visible but disabled in lobby)
+        st.markdown("""
+        <div style="margin-top: 3rem; text-align: center;">
+            <p style="color: #9aa0a6; font-size: 0.9rem; margin-bottom: 1rem;">
+                Accessibility features will be available after joining
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Disabled accessibility toggle for preview
+        st.checkbox(
+            "Enable accessibility mode",
+            value=True,
+            disabled=True,
+            help="This will be enabled after joining the meeting"
+        )
+
+
 def main_meet_ui() -> None:
     """
     Main entry point for Meet-style UI.
@@ -912,6 +1048,11 @@ def main_meet_ui() -> None:
     configure_meet_page()
     inject_meet_styles()
     init_meet_ui_state()
+    
+    # Check meeting state - render lobby if not in call
+    if st.session_state.get('meeting_state', 'LOBBY') == 'LOBBY':
+        render_meeting_lobby()
+        return
     
     # Import existing system functions (avoiding circular imports)
     try:

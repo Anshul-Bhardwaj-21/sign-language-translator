@@ -129,8 +129,9 @@ app.add_middleware(
         "http://127.0.0.1:3000",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Explicit methods only
+    allow_headers=["Content-Type", "Authorization"],  # Explicit headers only
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Connection manager instance

@@ -1,8 +1,8 @@
-# Core Application (Python 3.14 compatible)
+# Core Application (Python 3.11 compatible)
 streamlit>=1.32
 opencv-python>=4.8
 mediapipe==0.10.32
-numpy>=2.0.0  # Python 3.14 requires NumPy 2.x
+numpy>=1.23.0,<2.0.0  # MediaPipe requires NumPy 1.x
 pyttsx3>=2.90
 
 # WebRTC & Real-time Communication (optional for basic functionality)

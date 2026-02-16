@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 import uvicorn
 
 # Add parent directory to path to import app modules
@@ -58,8 +58,9 @@ class FrameRequest(BaseModel):
     session_id: str
     timestamp: float
     
-    @validator('frame')
-    def validate_frame(cls, v):
+    @field_validator('frame')
+    @classmethod
+    def validate_frame(cls, v: str) -> str:
         if not v.startswith('data:image/jpeg;base64,'):
             raise ValueError('Invalid frame format')
         if len(v) > 2_000_000:  # 2MB limit
@@ -201,8 +202,9 @@ app.add_middleware(
         "http://127.0.0.1:5173",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Explicit methods only
+    allow_headers=["Content-Type", "Authorization"],  # Explicit headers only
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Global instances
