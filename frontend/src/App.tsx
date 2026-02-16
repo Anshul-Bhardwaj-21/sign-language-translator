@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { ThemeProvider } from './contexts/ThemeContext'
 import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
 import PreJoinLobby from './pages/PreJoinLobby'
@@ -13,28 +12,26 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <ThemeProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LoginPage />} />
-          <Route path="/home" element={
-            <ProtectedRoute>
-              <HomePage />
-            </ProtectedRoute>
-          } />
-          <Route path="/lobby/:roomCode" element={
-            <ProtectedRoute>
-              <PreJoinLobby />
-            </ProtectedRoute>
-          } />
-          <Route path="/call/:roomCode" element={
-            <ProtectedRoute>
-              <VideoCallPageComplete />
-            </ProtectedRoute>
-          } />
-        </Routes>
-      </BrowserRouter>
-    </ThemeProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/home" element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/lobby/:roomCode" element={
+          <ProtectedRoute>
+            <PreJoinLobby />
+          </ProtectedRoute>
+        } />
+        <Route path="/call/:roomCode" element={
+          <ProtectedRoute>
+            <VideoCallPageComplete />
+          </ProtectedRoute>
+        } />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
