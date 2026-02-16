@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Video, VideoOff, Mic, MicOff, Copy, Volume2 } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function PreJoinLobby() {
@@ -9,10 +10,11 @@ export default function PreJoinLobby() {
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [micEnabled, setMicEnabled] = useState(true);
   const [accessibilityMode, setAccessibilityMode] = useState(false);
+  const [displayName, setDisplayName] = useState('');
+  const [displayNameError, setDisplayNameError] = useState('');
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string>('');
   const [isValidating, setIsValidating] = useState(true);
-  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -45,7 +47,6 @@ export default function PreJoinLobby() {
     navigator.mediaDevices.enumerateDevices()
       .then(devices => {
         const cameras = devices.filter(device => device.kind === 'videoinput');
-        setCameraDevices(cameras);
         if (cameras.length > 0) {
           setSelectedCamera(cameras[0].deviceId);
         }
@@ -136,11 +137,27 @@ export default function PreJoinLobby() {
   const handleJoin = () => {
     if (!roomCode) return;
 
+    // Validate display name
+    const trimmedName = displayName.trim();
+    if (!trimmedName) {
+      setDisplayNameError('Please enter your name');
+      return;
+    }
+    if (trimmedName.length < 2) {
+      setDisplayNameError('Name must be at least 2 characters');
+      return;
+    }
+    if (trimmedName.length > 50) {
+      setDisplayNameError('Name must be less than 50 characters');
+      return;
+    }
+
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
     }
 
     const state = {
+      displayName: trimmedName,
       cameraEnabled,
       micEnabled,
       accessibilityMode
@@ -189,12 +206,45 @@ export default function PreJoinLobby() {
             <span className="text-blue-400 font-mono text-xl">{roomCode}</span>
             <button
               onClick={() => navigator.clipboard.writeText(roomCode || '')}
-              className="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600"
+              className="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600 flex items-center gap-2"
               title="Copy room code"
             >
-              📋 Copy
+              <Copy className="w-4 h-4" />
+              Copy
             </button>
           </div>
+        </div>
+
+        {/* Display Name Input */}
+        <div className="mb-6">
+          <label htmlFor="displayName" className="block text-white text-sm font-medium mb-2">
+            Your Name
+          </label>
+          <input
+            id="displayName"
+            type="text"
+            value={displayName}
+            onChange={(e) => {
+              setDisplayName(e.target.value);
+              setDisplayNameError('');
+            }}
+            onBlur={() => {
+              const trimmed = displayName.trim();
+              if (!trimmed) {
+                setDisplayNameError('Please enter your name');
+              } else if (trimmed.length < 2) {
+                setDisplayNameError('Name must be at least 2 characters');
+              } else if (trimmed.length > 50) {
+                setDisplayNameError('Name must be less than 50 characters');
+              }
+            }}
+            placeholder="Enter your name"
+            className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none"
+            maxLength={50}
+          />
+          {displayNameError && (
+            <div className="mt-2 text-red-400 text-sm">{displayNameError}</div>
+          )}
         </div>
 
         <div className="mb-6">
@@ -211,7 +261,7 @@ export default function PreJoinLobby() {
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <div className="text-6xl mb-4">📷</div>
+                  <VideoOff className="w-16 h-16 mx-auto mb-4 text-gray-500" />
                   <div className="text-gray-400">
                     {cameraEnabled ? 'Loading camera...' : 'Camera preview off'}
                   </div>
@@ -222,9 +272,19 @@ export default function PreJoinLobby() {
           
           <button
             onClick={toggleCameraPreview}
-            className="mt-3 w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+            className="mt-3 w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 flex items-center justify-center gap-2"
           >
-            {cameraEnabled ? '📹 Turn off camera preview' : '📷 Turn on camera preview'}
+            {cameraEnabled ? (
+              <>
+                <VideoOff className="w-5 h-5" />
+                Turn off camera preview
+              </>
+            ) : (
+              <>
+                <Video className="w-5 h-5" />
+                Turn on camera preview
+              </>
+            )}
           </button>
         </div>
 
@@ -245,7 +305,12 @@ export default function PreJoinLobby() {
               onChange={(e) => setMicEnabled(e.target.checked)}
               className="w-5 h-5"
             />
-            <span className="text-white">🎤 Microphone</span>
+            {micEnabled ? (
+              <Mic className="w-5 h-5 text-white" />
+            ) : (
+              <MicOff className="w-5 h-5 text-red-500" />
+            )}
+            <span className="text-white">Microphone</span>
           </label>
 
           <label className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600">
@@ -261,7 +326,12 @@ export default function PreJoinLobby() {
               }}
               className="w-5 h-5"
             />
-            <span className="text-white">📹 Camera</span>
+            {cameraEnabled ? (
+              <Video className="w-5 h-5 text-white" />
+            ) : (
+              <VideoOff className="w-5 h-5 text-red-500" />
+            )}
+            <span className="text-white">Camera</span>
           </label>
 
           <label className="flex items-center gap-3 p-3 bg-purple-900 rounded-lg cursor-pointer hover:bg-purple-800">
@@ -271,13 +341,15 @@ export default function PreJoinLobby() {
               onChange={(e) => setAccessibilityMode(e.target.checked)}
               className="w-5 h-5"
             />
-            <span className="text-white">🧏 Accessibility Mode (Sign Language Recognition)</span>
+            <Volume2 className="w-5 h-5 text-white" />
+            <span className="text-white">Accessibility Mode (Sign Language Recognition)</span>
           </label>
         </div>
 
         <button
           onClick={handleJoin}
-          className="w-full px-6 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          disabled={!displayName.trim() || displayNameError !== ''}
+          className="w-full px-6 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Join Meeting
         </button>
