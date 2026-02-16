@@ -70,16 +70,19 @@ export default function VideoCallPage() {
   const frameCaptureManagerRef = useRef<FrameCaptureManager | null>(null);
   const userIdRef = useRef(displayName ? `${displayName}_${Math.random().toString(36).substring(2, 11)}` : 'user_' + Math.random().toString(36).substring(2, 11));
   const captionHistoryRef = useRef<HTMLDivElement>(null);
+  const initializingRef = useRef(false);  // Prevent concurrent camera initialization
 
   /**
    * FIX #1: Robust Camera Initialization
    * - Multiple fallback constraints
    * - Proper error handling
    * - Loading states
+   * - Race condition prevention
    */
   const initializeCamera = useCallback(async () => {
-    if (!cameraEnabled) return;
+    if (!cameraEnabled || initializingRef.current) return;  // Prevent concurrent calls
     
+    initializingRef.current = true;  // Lock initialization
     setIsLoadingCamera(true);
     setCameraError('');
 
@@ -121,6 +124,7 @@ export default function VideoCallPage() {
         }
         
         setIsLoadingCamera(false);
+        initializingRef.current = false;  // Unlock on success
         return; // Success!
       } catch (err) {
         console.log('Camera attempt failed:', err);
@@ -132,6 +136,7 @@ export default function VideoCallPage() {
     setCameraError('Could not access camera. Please check permissions or close other apps using the camera.');
     setIsLoadingCamera(false);
     setCameraEnabled(false);
+    initializingRef.current = false;  // Unlock on failure
   }, [cameraEnabled]);
 
   /**
