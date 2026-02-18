@@ -251,7 +251,6 @@ class CVPipelineState:
         self.text_generator: Optional[TextGenerator] = None
         self.gesture_controller: Optional[GestureController] = None
         self.movement_tracker: Optional[MovementTracker] = None
-        self.frame_queue: asyncio.Queue = asyncio.Queue(maxsize=3)
     
     def initialize(self):
         """Initialize all CV components."""
@@ -486,16 +485,7 @@ async def cv_websocket_endpoint(websocket: WebSocket, session_id: str, user_id: 
             data = await websocket.receive_json()
             
             if data.get("type") == "video_frame":
-                # Add to frame queue (drop oldest if full)
-                if pipeline.frame_queue.full():
-                    try:
-                        pipeline.frame_queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        pass
-                
-                await pipeline.frame_queue.put(data)
-                
-                # Process frame
+                # Process frame immediately (frontend already throttles to 10 FPS)
                 await process_cv_frame(data, pipeline, websocket)
     
     except WebSocketDisconnect:

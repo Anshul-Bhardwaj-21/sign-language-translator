@@ -17,7 +17,6 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from sklearn.model_selection import train_test_split
 
 # Configuration
 IMG_SIZE = 224
@@ -91,7 +90,7 @@ def prepare_data_generators(data_dir: str) -> Tuple[ImageDataGenerator, ImageDat
     """Create training and validation data generators with augmentation."""
     
     train_datagen = ImageDataGenerator(
-        rescale=1./255,
+        # Note: Rescaling removed - model has Rescaling layer
         rotation_range=15,
         width_shift_range=0.1,
         height_shift_range=0.1,
@@ -103,7 +102,7 @@ def prepare_data_generators(data_dir: str) -> Tuple[ImageDataGenerator, ImageDat
     )
     
     val_datagen = ImageDataGenerator(
-        rescale=1./255,
+        # Note: Rescaling removed - model has Rescaling layer
         validation_split=0.2
     )
     
