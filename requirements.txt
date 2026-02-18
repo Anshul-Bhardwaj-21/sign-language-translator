@@ -5,6 +5,19 @@ mediapipe==0.10.32
 numpy>=1.23.0,<2.0.0  # MediaPipe requires NumPy 1.x
 pyttsx3>=2.90
 
+# Machine Learning & ASL Recognition
+tensorflow>=2.13.0,<2.16.0  # ASL model training and inference
+scikit-learn>=1.3.0
+pandas>=2.1.0
+albumentations>=1.3.0
+joblib>=1.3.0
+
+# Text-to-Speech
+gtts>=2.5.0  # Google Text-to-Speech for audio generation
+
+# Kaggle API (for dataset download)
+kaggle>=1.6.0
+
 # WebRTC & Real-time Communication (optional for basic functionality)
 aiortc>=1.6.0
 aiohttp>=3.9.0
@@ -24,10 +37,6 @@ google-cloud-storage>=2.13.0
 # ML & Training (optional for basic functionality)
 torch>=2.1.0
 torchvision>=0.16.0
-scikit-learn>=1.3.0
-pandas>=2.1.0
-albumentations>=1.3.0
-joblib>=1.3.0
 
 # Utilities
 pyyaml>=6.0.0

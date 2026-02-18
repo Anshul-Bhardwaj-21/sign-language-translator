@@ -22,6 +22,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import ParticipantTile from '../components/ParticipantTile';
 import ChatPanel from '../components/ChatPanel';
 import ParticipantsPanel from '../components/ParticipantsPanel';
+import ASLCaptionDisplay from '../components/ASLCaptionDisplay';
+import ASLAudioPlayer, { getAudioPlayerInstance } from '../components/ASLAudioPlayer';
+import { ASLCaptureService, CaptionMessage, AudioMessage, ErrorMessage } from '../services/ASLCaptureService';
 
 interface Participant {
   id: string;
@@ -65,6 +68,16 @@ const VideoCallPage: React.FC = () => {
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [fps, setFps] = useState(0);
+  
+  // ASL state
+  const [isASLMode, setIsASLMode] = useState(false);
+  const [aslConnected, setAslConnected] = useState(false);
+  const [liveCaption, setLiveCaption] = useState('');
+  const [confirmedWords, setConfirmedWords] = useState<string[]>([]);
+  const [confirmedSentences, setConfirmedSentences] = useState<string[]>([]);
+  const [aslError, setAslError] = useState<string | null>(null);
+  
+  const aslServiceRef = useRef<ASLCaptureService | null>(null);
 
   // Participants and messages
   const [participants, setParticipants] = useState<Participant[]>([
@@ -236,7 +249,82 @@ const VideoCallPage: React.FC = () => {
     if (localStream) {
       localStream.getTracks().forEach((track) => track.stop());
     }
+    
+    // Stop ASL service
+    if (aslServiceRef.current) {
+      aslServiceRef.current.stop();
+      aslServiceRef.current = null;
+    }
+    
     navigate('/dashboard');
+  };
+  
+  // Toggle ASL mode
+  const toggleASLMode = async () => {
+    if (isASLMode) {
+      // Stop ASL mode
+      if (aslServiceRef.current) {
+        aslServiceRef.current.stop();
+        aslServiceRef.current = null;
+      }
+      setIsASLMode(false);
+      setAslConnected(false);
+      setLiveCaption('');
+      setConfirmedWords([]);
+      setAslError(null);
+    } else {
+      // Start ASL mode
+      try {
+        const service = new ASLCaptureService({
+          sessionId: roomCode || 'default',
+          userId: user?.id || 'guest',
+          backendUrl: 'ws://localhost:8000'
+        });
+        
+        // Register callbacks
+        service.onCaption((caption: CaptionMessage) => {
+          if (caption.level === 'live') {
+            setLiveCaption(caption.text);
+          } else if (caption.level === 'word') {
+            setConfirmedWords(caption.text.split(' '));
+          } else if (caption.level === 'sentence') {
+            setConfirmedSentences(prev => [...prev, caption.text]);
+            setConfirmedWords([]);
+            setLiveCaption('');
+          }
+        });
+        
+        service.onAudio((audio: AudioMessage) => {
+          const audioPlayer = getAudioPlayerInstance();
+          if (audioPlayer) {
+            audioPlayer.addToQueue(audio);
+          }
+        });
+        
+        service.onError((error: ErrorMessage) => {
+          console.error('ASL error:', error);
+          setAslError(error.message);
+          
+          if (error.severity === 'fatal') {
+            setIsASLMode(false);
+            setAslConnected(false);
+          }
+        });
+        
+        service.onConnectionChange((connected: boolean) => {
+          setAslConnected(connected);
+        });
+        
+        // Start service
+        await service.start();
+        aslServiceRef.current = service;
+        setIsASLMode(true);
+        
+      } catch (error) {
+        console.error('Failed to start ASL mode:', error);
+        setAslError(error instanceof Error ? error.message : 'Failed to start ASL mode');
+      }
+    }
   };
 
   // Keyboard shortcuts
@@ -288,6 +376,9 @@ const VideoCallPage: React.FC = () => {
     return () => {
       if (localStream) {
         localStream.getTracks().forEach((track) => track.stop());
+      }
+      if (aslServiceRef.current) {
+        aslServiceRef.current.stop();
       }
     };
   }, [localStream]);
@@ -352,7 +443,7 @@ const VideoCallPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-6 overflow-hidden">
+      <div className="flex-1 flex items-center justify-center p-6 overflow-hidden relative">
         <div className={`grid ${getGridCols()} gap-4 max-w-7xl w-full`}>
           {participants.map((participant) => (
             <ParticipantTile
@@ -364,6 +455,32 @@ const VideoCallPage: React.FC = () => {
             />
           ))}
         </div>
+        
+        {/* ASL Caption Display */}
+        {isASLMode && (
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4">
+            <ASLCaptionDisplay
+              liveCaption={liveCaption}
+              confirmedWords={confirmedWords}
+              confirmedSentences={confirmedSentences}
+            />
+            
+            {/* ASL Status Indicator */}
+            <div className="mt-4 flex items-center justify-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${aslConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-white text-sm">
+                {aslConnected ? 'ASL Recognition Active' : 'Connecting...'}
+              </span>
+            </div>
+            
+            {/* ASL Error Display */}
+            {aslError && (
+              <div className="mt-2 bg-red-500/20 border border-red-500 rounded-lg p-3 text-red-200 text-sm">
+                {aslError}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Control Bar */}
@@ -431,6 +548,19 @@ const VideoCallPage: React.FC = () => {
             title="Raise hand (R)"
           >
             <Hand className="w-6 h-6 text-white" />
+          </button>
+          
+          {/* ASL Mode Toggle */}
+          <button
+            onClick={toggleASLMode}
+            className={`p-4 rounded-full transition-colors ${
+              isASLMode
+                ? 'bg-purple-600 hover:bg-purple-700'
+                : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+            title="Toggle ASL mode"
+          >
+            <Eye className="w-6 h-6 text-white" />
           </button>
 
           {/* Chat */}
@@ -525,6 +655,9 @@ const VideoCallPage: React.FC = () => {
 
       {/* Hidden video element for local stream */}
       <video ref={localVideoRef} autoPlay playsInline muted className="hidden" />
+      
+      {/* ASL Audio Player */}
+      {isASLMode && <ASLAudioPlayer />}
     </div>
   );
 };

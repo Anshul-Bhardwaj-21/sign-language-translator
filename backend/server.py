@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import io
 import logging
 from typing import Dict, List, Optional, Set
 from datetime import datetime
@@ -11,6 +13,15 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+import numpy as np
+import cv2
+
+# Import CV modules
+from app.inference.hand_detector import HandDetector, create_hand_detector
+from app.inference.asl_classifier import ASLClassifier, create_asl_classifier
+from app.inference.text_generator import TextGenerator, create_text_generator
+from app.inference.gesture_controls import GestureController
+from app.inference.movement_tracker import MovementTracker
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -228,8 +239,275 @@ async def store_caption(caption: CaptionMessage):
 
 
 # ============================================================================
+# CV Pipeline State Management
+# ============================================================================
+
+class CVPipelineState:
+    """Manages CV pipeline instances per user session."""
+    
+    def __init__(self):
+        self.hand_detector: Optional[HandDetector] = None
+        self.asl_classifier: Optional[ASLClassifier] = None
+        self.text_generator: Optional[TextGenerator] = None
+        self.gesture_controller: Optional[GestureController] = None
+        self.movement_tracker: Optional[MovementTracker] = None
+        self.frame_queue: asyncio.Queue = asyncio.Queue(maxsize=3)
+    
+    def initialize(self):
+        """Initialize all CV components."""
+        try:
+            self.hand_detector = create_hand_detector(max_num_hands=1)
+            self.asl_classifier = create_asl_classifier()
+            self.text_generator = create_text_generator()
+            self.gesture_controller = GestureController()
+            self.movement_tracker = MovementTracker()
+            logger.info("CV pipeline initialized")
+        except Exception as exc:
+            logger.error(f"Failed to initialize CV pipeline: {exc}")
+    
+    def cleanup(self):
+        """Clean up CV resources."""
+        if self.hand_detector:
+            self.hand_detector.close()
+        if self.text_generator:
+            self.text_generator.reset()
+
+
+# CV pipeline instances per session
+cv_pipelines: Dict[str, CVPipelineState] = {}
+
+
+async def process_cv_frame(
+    frame_data: dict,
+    pipeline: CVPipelineState,
+    websocket: WebSocket
+) -> None:
+    """
+    Process single video frame through CV pipeline.
+    
+    Pipeline:
+    1. Decode frame
+    2. Detect hand
+    3. Classify ASL gesture
+    4. Generate text
+    5. Detect control gestures (fist)
+    6. Send captions
+    7. Trigger TTS on sentence confirmation
+    """
+    try:
+        # Decode base64 JPEG
+        image_data = base64.b64decode(frame_data["image"])
+        nparr = np.frombuffer(image_data, np.uint8)
+        frame_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame_bgr is None:
+            await websocket.send_json({
+                "type": "error",
+                "code": "INVALID_FRAME",
+                "message": "Failed to decode frame",
+                "severity": "warning",
+                "timestamp": int(datetime.now().timestamp() * 1000)
+            })
+            return
+        
+        # Convert BGR to RGB
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        
+        # 1. Hand detection
+        hand_result = pipeline.hand_detector.detect(frame_rgb, draw_landmarks=False)
+        
+        if not hand_result.hand_detected:
+            # No hand detected - send nothing caption
+            await websocket.send_json({
+                "type": "caption",
+                "level": "live",
+                "text": "",
+                "confidence": 0.0,
+                "timestamp": int(datetime.now().timestamp() * 1000)
+            })
+            return
+        
+        # 2. Movement tracking
+        movement_snapshot = pipeline.movement_tracker.update(hand_result.primary_landmarks)
+        
+        # 3. ASL classification (only on stable hand)
+        if movement_snapshot.state in {"stable", "idle"}:
+            asl_prediction = pipeline.asl_classifier.predict(frame_rgb)
+            
+            if asl_prediction.is_stable and asl_prediction.letter != "nothing":
+                # 4. Text generation
+                text_state = pipeline.text_generator.add_letter(asl_prediction.letter)
+                
+                # Send live caption (current word)
+                if text_state.current_word:
+                    await websocket.send_json({
+                        "type": "caption",
+                        "level": "live",
+                        "text": text_state.current_word,
+                        "confidence": asl_prediction.confidence,
+                        "timestamp": int(datetime.now().timestamp() * 1000)
+                    })
+                
+                # Send confirmed words
+                if text_state.confirmed_words:
+                    await websocket.send_json({
+                        "type": "caption",
+                        "level": "word",
+                        "text": " ".join(text_state.confirmed_words),
+                        "confidence": 1.0,
+                        "timestamp": int(datetime.now().timestamp() * 1000)
+                    })
+        
+        # 5. Gesture control detection (fist for sentence confirmation)
+        gesture_event = pipeline.gesture_controller.update(
+            hand_result.primary_landmarks,
+            movement_snapshot.state,
+            hand_result.handedness
+        )
+        
+        if gesture_event.confirmed and gesture_event.action == "confirm_sentence":
+            sentence = pipeline.text_generator.confirm_sentence_by_fist()
+            if sentence:
+                # Send confirmed sentence
+                await websocket.send_json({
+                    "type": "caption",
+                    "level": "sentence",
+                    "text": sentence,
+                    "confidence": 1.0,
+                    "timestamp": int(datetime.now().timestamp() * 1000)
+                })
+                
+                # 6. Generate TTS audio
+                await generate_and_send_tts(sentence, websocket)
+        
+        # Check for idle timeout sentence confirmation
+        idle_sentence = pipeline.text_generator.confirm_sentence_by_idle()
+        if idle_sentence:
+            await websocket.send_json({
+                "type": "caption",
+                "level": "sentence",
+                "text": idle_sentence,
+                "confidence": 1.0,
+                "timestamp": int(datetime.now().timestamp() * 1000)
+            })
+            await generate_and_send_tts(idle_sentence, websocket)
+    
+    except Exception as exc:
+        logger.error(f"CV frame processing error: {exc}")
+        await websocket.send_json({
+            "type": "error",
+            "code": "PROCESSING_FAILED",
+            "message": str(exc),
+            "severity": "recoverable",
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        })
+
+
+async def generate_and_send_tts(text: str, websocket: WebSocket) -> None:
+    """Generate TTS audio and send to client."""
+    try:
+        # Use gTTS for MP3 generation
+        from gtts import gTTS
+        
+        # Generate speech
+        tts = gTTS(text=text, lang='en', slow=False)
+        
+        # Save to bytes buffer
+        audio_buffer = io.BytesIO()
+        tts.write_to_fp(audio_buffer)
+        audio_buffer.seek(0)
+        
+        # Encode to base64
+        audio_base64 = base64.b64encode(audio_buffer.read()).decode('utf-8')
+        
+        # Send to client
+        await websocket.send_json({
+            "type": "audio",
+            "format": "mp3",
+            "data": audio_base64,
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        })
+        
+        logger.info(f"TTS audio sent for text: {text}")
+    
+    except ImportError:
+        logger.warning("gTTS not installed. Install with: pip install gtts")
+        # Send caption only without audio
+    except Exception as exc:
+        logger.error(f"TTS generation failed: {exc}")
+        # Continue without audio
+
+
+# ============================================================================
 # WebSocket Endpoints
 # ============================================================================
+
+@app.websocket("/ws/cv/{session_id}/{user_id}")
+async def cv_websocket_endpoint(websocket: WebSocket, session_id: str, user_id: str):
+    """
+    Computer Vision WebSocket endpoint for ASL recognition.
+    
+    Receives video frames, processes through CV pipeline, sends captions and audio.
+    
+    Message types (Client → Server):
+    - video_frame: Frame data for processing
+    
+    Message types (Server → Client):
+    - caption: Live/word/sentence caption
+    - audio: TTS audio (base64 MP3)
+    - error: Processing error
+    """
+    await websocket.accept()
+    
+    # Initialize CV pipeline for this session
+    pipeline_key = f"{session_id}_{user_id}"
+    if pipeline_key not in cv_pipelines:
+        cv_pipelines[pipeline_key] = CVPipelineState()
+        cv_pipelines[pipeline_key].initialize()
+    
+    pipeline = cv_pipelines[pipeline_key]
+    
+    # Check if ASL model is loaded
+    if not pipeline.asl_classifier or not pipeline.asl_classifier.is_ready():
+        await websocket.send_json({
+            "type": "error",
+            "code": "MODEL_NOT_FOUND",
+            "message": "ASL model not found. Run backend/train_asl_model.py to train the model.",
+            "severity": "fatal",
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        })
+        await websocket.close()
+        return
+    
+    logger.info(f"CV WebSocket connected: {user_id} in session {session_id}")
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            
+            if data.get("type") == "video_frame":
+                # Add to frame queue (drop oldest if full)
+                if pipeline.frame_queue.full():
+                    try:
+                        pipeline.frame_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        pass
+                
+                await pipeline.frame_queue.put(data)
+                
+                # Process frame
+                await process_cv_frame(data, pipeline, websocket)
+    
+    except WebSocketDisconnect:
+        logger.info(f"CV WebSocket disconnected: {user_id}")
+    except Exception as exc:
+        logger.error(f"CV WebSocket error: {exc}")
+    finally:
+        # Cleanup
+        if pipeline_key in cv_pipelines:
+            cv_pipelines[pipeline_key].cleanup()
+            del cv_pipelines[pipeline_key]
+
 
 @app.websocket("/ws/{session_id}/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str, user_id: str):
