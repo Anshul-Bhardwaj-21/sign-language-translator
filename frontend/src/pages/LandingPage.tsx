@@ -1,98 +1,86 @@
-import { useState } from 'react';
+﻿import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../services/api';
+import { Video, Users, Shield, Zap, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
 
-export default function LandingPage() {
+const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [roomCode, setRoomCode] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleCreateRoom = async () => {
-    setIsCreating(true);
-    setError('');
-    
-    try {
-      const userId = 'user_' + Math.random().toString(36).substr(2, 9);
-      const result = await api.createRoom(userId, false);
-      navigate(`/lobby/${result.room_code}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create room');
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const handleJoinRoom = () => {
-    if (!roomCode.trim()) {
-      setError('Please enter a room code');
-      return;
-    }
-    navigate(`/lobby/${roomCode.trim().toUpperCase()}`);
-  };
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="min-h-screen bg-meet-dark flex items-center justify-center p-8">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-white mb-4">
-            🧏 Sign Language Video Call
-          </h1>
-          <p className="text-gray-400 text-lg">
-            Accessible video meetings with real-time sign language recognition
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900 relative overflow-hidden">
+      {/* Animated background blobs */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+      </div>
+
+      {/* Theme toggle */}
+      <button
+        onClick={toggleTheme}
+        className="absolute top-6 right-6 p-3 rounded-full bg-white/10 backdrop-blur-md hover:bg-white/20 transition-all z-10"
+        aria-label="Toggle theme"
+      >
+        {theme === 'dark' ? (
+          <Sun className="w-6 h-6 text-yellow-300" />
+        ) : (
+          <Moon className="w-6 h-6 text-blue-900" />
+        )}
+      </button>
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 text-center">
+        {/* Logo */}
+        <div className="mb-8 p-6 rounded-full bg-white/10 backdrop-blur-md">
+          <Video className="w-16 h-16 text-white" />
         </div>
 
-        <div className="bg-meet-gray rounded-lg p-8 shadow-2xl">
-          {error && (
-            <div className="mb-6 p-4 bg-red-900 border border-red-700 rounded-lg">
-              <p className="text-red-200 text-sm">{error}</p>
-            </div>
-          )}
+        {/* Title */}
+        <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 animate-fade-in">
+          Welcome to VideoCall
+        </h1>
+        <p className="text-xl md:text-2xl text-white/90 mb-12 max-w-2xl animate-fade-in-delay">
+          Professional video meetings with sign language support, secure moderation, and luxury design
+        </p>
 
+        {/* CTA Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-16 animate-fade-in-delay-2">
           <button
-            onClick={handleCreateRoom}
-            disabled={isCreating}
-            className="w-full px-6 py-4 bg-blue-600 text-white text-lg font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-6"
+            onClick={() => navigate('/login')}
+            className="px-8 py-4 bg-white text-blue-600 rounded-full font-semibold text-lg hover:bg-blue-50 transform hover:scale-105 transition-all shadow-xl"
           >
-            {isCreating ? 'Creating Room...' : '➕ Create New Room'}
+            Get Started
           </button>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-600"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-meet-gray text-gray-400">OR</span>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <input
-              type="text"
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-              onKeyPress={(e) => e.key === 'Enter' && handleJoinRoom()}
-              placeholder="Enter room code"
-              className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none text-center text-lg font-mono"
-              maxLength={8}
-            />
-            
-            <button
-              onClick={handleJoinRoom}
-              className="w-full px-6 py-3 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 transition-colors"
-            >
-              Join Room
-            </button>
-          </div>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-8 py-4 bg-white/10 backdrop-blur-md text-white rounded-full font-semibold text-lg hover:bg-white/20 transform hover:scale-105 transition-all border-2 border-white/30"
+          >
+            Sign In
+          </button>
         </div>
 
-        <div className="mt-8 text-center text-gray-500 text-sm">
-          <p>✓ No account required</p>
-          <p>✓ End-to-end encrypted</p>
-          <p>✓ Accessibility first</p>
+        {/* Features */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl animate-fade-in-delay-3">
+          <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 transition-all">
+            <Users className="w-12 h-12 text-white mb-4 mx-auto" />
+            <h3 className="text-xl font-semibold text-white mb-2">Multi-Participant</h3>
+            <p className="text-white/80">Host meetings with multiple participants and grid layout</p>
+          </div>
+          <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 transition-all">
+            <Shield className="w-12 h-12 text-white mb-4 mx-auto" />
+            <h3 className="text-xl font-semibold text-white mb-2">Secure & Moderated</h3>
+            <p className="text-white/80">Admin controls to prevent raids and ensure safe meetings</p>
+          </div>
+          <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 transition-all">
+            <Zap className="w-12 h-12 text-white mb-4 mx-auto" />
+            <h3 className="text-xl font-semibold text-white mb-2">Sign Language Support</h3>
+            <p className="text-white/80">Real-time sign language recognition and captions</p>
+          </div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default LandingPage;
