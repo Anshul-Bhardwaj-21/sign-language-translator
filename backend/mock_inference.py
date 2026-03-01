@@ -6,7 +6,7 @@ No external AI API calls - deterministic predictions for offline demo
 import random
 import time
 from typing import Dict, List, Optional, Tuple
-from dataclimport dataclass
+from dataclasses import dataclass
 
 
 @dataclass
