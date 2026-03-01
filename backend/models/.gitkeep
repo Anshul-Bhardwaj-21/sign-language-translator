@@ -1,0 +1,2 @@
+# Models directory for trained ASL classifier
+# Place asl_mobilenetv2.h5 here after training
