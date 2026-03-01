@@ -3,9 +3,6 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    @apply border-border;
-  }
   
   body {
     @apply bg-navy-950 text-white antialiased;
