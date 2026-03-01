@@ -1,165 +1,345 @@
-# Sign Language Video Call System
+# Sign Language Video Call Application
 
-A production-grade video meeting application with real-time sign language recognition.
+A real-time video calling application with ASL (American Sign Language) recognition and live captioning.
 
-**Tech Stack:** React + TypeScript + Python + FastAPI + MediaPipe
-
-## 🚀 Quick Start
+## 🚀 Quick Start (2-Minute Demo)
 
 ### Prerequisites
-- Node.js 18+ 
-- Python 3.10+
+- **Python 3.10+** (check: `python --version`)
+- **Node.js 18+** (check: `node --version`)
+- **Webcam** (for video calling)
 
-### Run It (3 Commands)
+### Step 1: Start Backend (Terminal 1)
 
-```bash
-# 1. Install frontend dependencies (first time only)
-cd frontend
-npm install
-
-# 2. Start backend (new terminal)
-python backend/enhanced_server.py
-
-# 3. Start frontend (new terminal)
-cd frontend
-npm run dev
-
-# 4. Open http://localhost:3000
+**Windows:**
+```powershell
+cd backend
+.\run-dev.ps1
 ```
 
-**That's it!** See [GETTING_STARTED.md](GETTING_STARTED.md) for detailed instructions.
+**Linux/Mac:**
+```bash
+cd backend
+chmod +x run-dev.sh
+./run-dev.sh
+```
 
-## 🎯 What This Is
+Wait for: `Application startup complete` message
 
-A complete video meeting system with:
-- ✅ Pre-join lobby (camera never auto-starts)
-- ✅ Room system (create/join with codes)
-- ✅ Google Meet-style UI
-- ✅ Real-time hand detection & gesture recognition
-- ✅ Live captions with text-to-speech
-- ✅ Full accessibility support
+### Step 2: Start Frontend (Terminal 2)
+
+**Windows:**
+```powershell
+cd frontend
+.\run-dev.ps1
+```
+
+**Linux/Mac:**
+```bash
+cd frontend
+chmod +x run-dev.sh
+./run-dev.sh
+```
+
+Wait for: `Local: http://localhost:5173` message
+
+### Step 3: Demo the App
+
+1. Open **TWO browser tabs** (Chrome/Edge recommended):
+   - Tab A: http://localhost:5173
+   - Tab B: http://localhost:5173
+
+2. **Tab A** (Host):
+   - Click "Create Room"
+   - Copy the room code (e.g., "ABC123")
+   - Enable camera when prompted
+   - Turn ON "Accessibility Mode" (🧏 button)
+
+3. **Tab B** (Guest):
+   - Click "Join Room"
+   - Paste the room code
+   - Click "Join"
+   - Enable camera when prompted
+
+4. **Test Features**:
+   - ✅ Both tabs should see each other's video
+   - ✅ Wave your hand in Tab A → Tab B sees mock captions
+   - ✅ Type in chat → messages appear in both tabs
+   - ✅ Click speaker icon → browser TTS reads captions
+
+## 📋 Features
+
+### Core Features (Working)
+- ✅ **WebRTC Video Calling** - Peer-to-peer video between 2+ users
+- ✅ **WebSocket Signaling** - Real-time connection establishment
+- ✅ **Mock ASL Recognition** - Deterministic gesture detection (offline)
+- ✅ **Live Captions** - Real-time caption display with confidence scores
+- ✅ **Text-to-Speech** - Browser-based TTS (no external API)
+- ✅ **Chat** - Text messaging between participants
+- ✅ **Accessibility Mode** - Toggle ASL recognition on/off
+- ✅ **Camera Controls** - Turn camera on/off reliably
+- ✅ **Keyboard Shortcuts** - Full keyboard navigation
+
+### Mock Inference Mode
+The app uses **mock ASL inference** by default (no external AI APIs required):
+- Deterministic predictions based on hand geometry
+- Works completely offline
+- No API keys needed
+- Suitable for demos and development
+
+To use real ASL models, see `docs/ML_SETUP.md` (requires training data).
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐         WebSocket          ┌─────────────────┐
+│   Frontend      │◄──────────────────────────►│   Backend       │
+│   (React +      │    Signaling + Captions    │   (FastAPI)     │
+│    Vite)        │                            │                 │
+└─────────────────┘                            └─────────────────┘
+        │                                               │
+        │ WebRTC (P2P)                                 │
+        │                                               │
+        ▼                                               ▼
+┌─────────────────┐                            ┌─────────────────┐
+│   Browser A     │◄──────────────────────────►│  Mock Inference │
+│   (Peer 1)      │    Video/Audio Streams     │   Engine        │
+└─────────────────┘                            └─────────────────┘
+```
 
 ## 📁 Project Structure
 
 ```
-├── frontend/              # React + TypeScript frontend
+sign-language-translator/
+├── backend/
+│   ├── simple_server.py      # Main FastAPI server
+│   ├── mock_inference.py     # Mock ASL model (no external APIs)
+│   ├── run-dev.ps1           # Windows start script
+│   ├── run-dev.sh            # Linux/Mac start script
+│   └── .env.example          # Environment variables template
+├── frontend/
 │   ├── src/
-│   │   ├── pages/        # Landing, Lobby, Video Call
-│   │   ├── services/     # API client, Frame Capture
-│   │   └── styles/       # Tailwind CSS
-│   └── package.json
-│
-├── backend/              # Python + FastAPI backend
-│   └── enhanced_server.py  # ML-integrated server
-│
-├── app/                  # Your existing ML code
-│   ├── inference/        # Hand detection, tracking
-│   └── ...
-│
-└── ml/                   # ML models and training
-    └── ...
+│   │   ├── pages/
+│   │   │   └── VideoCallPage.tsx  # Main video call UI
+│   │   ├── services/
+│   │   │   ├── api.ts             # Backend API client
+│   │   │   └── FrameCaptureManager.ts  # Frame capture logic
+│   │   └── components/            # Reusable UI components
+│   ├── run-dev.ps1           # Windows start script
+│   ├── run-dev.sh            # Linux/Mac start script
+│   └── .env                  # Environment variables
+├── README.md                 # This file
+├── backend/DEBUG_REPORT.md   # Backend debugging guide
+└── frontend/DEBUG_REPORT.md  # Frontend debugging guide
 ```
 
-## 🎬 How It Works
+## 🔧 Manual Setup (If Scripts Fail)
 
-1. **Landing Page** - Create or join a room
-2. **Pre-Join Lobby** - Configure camera/mic (camera OFF by default)
-3. **Video Call** - Real-time video with ML-powered captions
+### Backend Setup
 
-### User Flow
+```bash
+# Create virtual environment
+python -m venv .venv
 
+# Activate (Windows)
+.venv\Scripts\activate
+
+# Activate (Linux/Mac)
+source .venv/bin/activate
+
+# Install dependencies
+pip install fastapi uvicorn websockets python-multipart pydantic opencv-python numpy
+
+# Run server
+cd backend
+python simple_server.py
 ```
-Open App → Create Room → Get Room Code → Pre-Join Lobby
-  → Toggle Settings → Join Meeting → Video Call
-  → Enable Accessibility → Show Hand → See Captions!
+
+Server runs on: http://localhost:8001
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm ci
+
+# Run dev server
+npm run dev
 ```
 
-## 🔧 Tech Stack
+Frontend runs on: http://localhost:5173
 
-### Frontend
-- React 18 + TypeScript
-- Vite (build tool)
-- Tailwind CSS (styling)
-- React Router (routing)
+## 🎮 Keyboard Shortcuts
 
-### Backend
-- Python 3.10+ + FastAPI
-- MediaPipe (hand detection)
-- Your existing ML code (integrated)
-
-## 📚 Documentation
-
-- **START_HERE.md** - Complete getting started guide
-- **SETUP_INSTRUCTIONS.md** - Detailed setup steps
-- **REACT_IMPLEMENTATION_README.md** - Full documentation
-- **docs/** - Additional guides
-
-## 🎨 Features
-
-### Pre-Join Lobby
-- Camera preview (OFF by default) ✅
-- Room code display with copy button
-- Mic/camera/accessibility toggles
-- Explicit "Join Meeting" button
-
-### Video Call
-- Google Meet-style dark theme
-- Real-time hand detection
-- Live captions (high contrast, large text)
-- Text-to-speech
-- 7 control buttons
-
-### Accessibility
-- High contrast captions
-- Large font (24-32px)
-- Keyboard navigation
-- Screen reader support
-- Gesture controls
+| Key | Action |
+|-----|--------|
+| `M` | Toggle microphone |
+| `V` | Toggle camera |
+| `A` | Toggle accessibility mode |
+| `P` | Pause/resume gesture detection |
+| `Ctrl+C` | Clear all captions |
+| `Ctrl+S` | Speak captions aloud |
+| `Enter` | Confirm current caption |
 
 ## 🐛 Troubleshooting
 
-### "npm: command not found"
-Install Node.js from https://nodejs.org/
+### Backend Issues
 
-### "Module not found: mediapipe"
+**Port 8001 already in use:**
 ```bash
-pip install mediapipe opencv-python numpy fastapi uvicorn
+# Windows
+netstat -ano | findstr :8001
+taskkill /PID <PID> /F
+
+# Linux/Mac
+lsof -ti:8001 | xargs kill -9
 ```
 
-### Camera permission denied
-- Chrome: chrome://settings/content/camera
-- Allow localhost to access camera
+**Python not found:**
+- Install Python 3.10+ from https://www.python.org/downloads/
+- Ensure "Add to PATH" is checked during installation
 
-## 📊 Performance
+**Module not found errors:**
+```bash
+pip install --upgrade pip
+pip install fastapi uvicorn websockets python-multipart pydantic opencv-python numpy
+```
 
-- **Frame Capture**: 10 FPS (ML processing)
-- **Video Display**: 25 FPS (smooth playback)
-- **ML Processing**: ~40-60ms per frame
-- **Total Latency**: ~80-120ms ✅
+### Frontend Issues
 
-## 🎯 What's Next
+**Port 5173 already in use:**
+- Change port in `frontend/vite.config.ts`:
+  ```typescript
+  server: { port: 3000 }
+  ```
 
-### To Add Your Trained Model
-Replace the heuristic in `backend/enhanced_server.py` with your PyTorch model.
+**Node.js not found:**
+- Install Node.js 18+ from https://nodejs.org/
 
-### To Add Multi-User Video
-Implement WebRTC peer connections (see CODE_EXAMPLES.md in docs_archive).
+**npm ci fails:**
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
 
-### To Deploy
-Build frontend (`npm run build`) and deploy to Vercel/AWS.
+### Camera Issues
+
+**Camera not accessible:**
+1. Close other apps using the camera (Zoom, Teams, etc.)
+2. Check browser permissions (chrome://settings/content/camera)
+3. Try a different browser (Chrome/Edge recommended)
+4. Restart browser
+
+**Camera shows black screen:**
+1. Refresh the page
+2. Click "Turn On Camera" button again
+3. Check if camera works in other apps
+
+### WebRTC Connection Issues
+
+**Peers can't see each other:**
+1. Ensure both tabs are on the same room code
+2. Check browser console for errors (F12)
+3. Disable browser extensions (ad blockers)
+4. Try in incognito mode
+
+**No video/audio:**
+1. Check camera/mic permissions
+2. Ensure STUN server is accessible (requires internet)
+3. Check firewall settings
+
+## 📊 Testing Checklist
+
+- [ ] Backend starts without errors
+- [ ] Frontend starts without errors
+- [ ] Can create a room
+- [ ] Can join a room with code
+- [ ] Camera turns on/off reliably
+- [ ] Both peers see each other's video
+- [ ] Captions appear when accessibility mode is on
+- [ ] Chat messages are exchanged
+- [ ] TTS speaks captions
+- [ ] Keyboard shortcuts work
+- [ ] Can leave call cleanly
+
+## 🔐 Security Notes
+
+**For Development Only:**
+- CORS is wide open (all origins allowed)
+- No authentication/authorization
+- No HTTPS (required for production WebRTC)
+- No rate limiting
+
+**For Production:**
+- Add proper authentication (JWT, OAuth)
+- Restrict CORS to specific domains
+- Use HTTPS with valid certificates
+- Add rate limiting and input validation
+- Use TURN server for NAT traversal
+- Implement proper error handling
+
+## 📚 Additional Documentation
+
+- `backend/DEBUG_REPORT.md` - Backend debugging guide
+- `frontend/DEBUG_REPORT.md` - Frontend debugging guide
+- `docs/FIREBASE_SETUP.md` - Firebase integration (optional)
+- `docs/ML_SETUP.md` - Real ASL model training (optional)
+
+## 🤝 Contributing
+
+This is a hackathon/demo project. For production use:
+1. Replace mock inference with trained ASL models
+2. Add proper authentication
+3. Implement TURN server for NAT traversal
+4. Add end-to-end encryption
+5. Implement proper error handling and logging
 
 ## 📝 License
 
-[Your License Here]
+MIT License - See LICENSE file for details
 
-## 🙏 Acknowledgments
+## 🎯 Demo Script (2 Minutes)
 
-- MediaPipe team for hand tracking
-- Deaf community for feedback
-- Open source contributors
+**Presenter:**
+
+1. "I'll show you a video call app with real-time sign language recognition."
+
+2. **[Open two browser tabs]**
+   - "Tab 1 creates a room, Tab 2 joins with the code."
+
+3. **[Enable cameras]**
+   - "Both participants can see each other."
+
+4. **[Turn on Accessibility Mode in Tab 1]**
+   - "Now I enable ASL recognition."
+
+5. **[Wave hand in front of camera]**
+   - "The system detects hand gestures and generates captions in real-time."
+   - "Tab 2 sees the captions appear automatically."
+
+6. **[Click speaker icon]**
+   - "The browser reads the captions aloud using text-to-speech."
+
+7. **[Type in chat]**
+   - "We also have text chat for additional communication."
+
+8. "This enables deaf/hard-of-hearing users to communicate naturally in video calls."
+
+**Total time: ~2 minutes**
+
+## 🚀 Next Steps
+
+- [ ] Train real ASL model on dataset
+- [ ] Add user authentication
+- [ ] Implement TURN server
+- [ ] Add recording functionality
+- [ ] Mobile app (React Native)
+- [ ] Multi-language support
+- [ ] Gesture customization
+- [ ] Analytics dashboard
 
 ---
 
-**Version**: 2.0.0  
-**Status**: Production-Ready  
-**Last Updated**: February 15, 2026
+**Built with ❤️ for accessibility**
