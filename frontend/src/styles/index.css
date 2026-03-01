@@ -2,6 +2,115 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-navy-950 text-white antialiased;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-navy-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-blue-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-blue-500;
+  }
+}
+
+@layer components {
+  /* Glass effect utility */
+  .glass {
+    @apply backdrop-blur-xl bg-white/5 border border-white/10;
+  }
+
+  /* Glow text effect */
+  .text-glow {
+    text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+  }
+
+  /* Animated gradient background */
+  .gradient-animate {
+    background-size: 200% 200%;
+    animation: gradient 3s ease infinite;
+  }
+
+  @keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* Mirror effect for video */
+  .mirror {
+    transform: scaleX(-1);
+  }
+
+  /* Loading spinner */
+  .loading-spinner {
+    @apply w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Caption animation */
+  .caption-enter {
+    animation: caption-slide-up 0.3s ease-out;
+  }
+
+  @keyframes caption-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Pulse animation for mic */
+  .mic-pulse {
+    animation: mic-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes mic-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+  }
+}
+
+@layer utilities {
+  /* Custom utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
 /* Theme Variables */
 :root[data-theme="dark"] {
   --bg-primary: #111827;
