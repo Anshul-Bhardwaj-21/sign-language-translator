@@ -18,7 +18,7 @@ export const WebSocketProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const handlersRef = useRef<Map<string, Set<MessageHandler>>>(new Map());
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const connect = (roomCode: string, userId: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

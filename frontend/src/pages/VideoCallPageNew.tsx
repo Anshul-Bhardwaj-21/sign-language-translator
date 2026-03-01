@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Video, VideoOff, Mic, MicOff, Phone, Settings, MessageSquare, Users } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import GlassCard from '../components/ui/GlassCard';
-import StatusBadge from '../components/ui/StatusBadge';
+import { GlassCard } from '../components/ui/GlassCard';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { useToast } from '../hooks/useToast';
 
 interface Caption {
@@ -25,8 +25,8 @@ export default function VideoCallPageNew() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
   const { user, aiStatus, incrementWordsRecognized, setIsInCall, connectionStrength } = useApp();
-  const { isConnected, sendMessage, subscribe } = useWebSocket();
-  const { showToast } = useToast();
+  const { isConnected, subscribe } = useWebSocket();
+  const { error: showToast } = useToast();
 
   // Media states
   const [cameraEnabled, setCameraEnabled] = useState(true);
@@ -36,11 +36,9 @@ export default function VideoCallPageNew() {
   // UI states
   const [showChat, setShowChat] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showParticipants, setShowParticipants] = useState(false);
 
   // Caption states
   const [captions, setCaptions] = useState<Caption[]>([]);
-  const [currentCaption, setCurrentCaption] = useState<Caption | null>(null);
   const [handDetected, setHandDetected] = useState(false);
   const [gestureStable, setGestureStable] = useState(false);
   const [recognitionConfidence, setRecognitionConfidence] = useState(0);
@@ -88,7 +86,6 @@ export default function VideoCallPageNew() {
 
     const unsubCaption = subscribe('caption', (data: Caption) => {
       setCaptions(prev => [...prev, data]);
-      setCurrentCaption(data);
       incrementWordsRecognized();
       setTotalWordsDetected(prev => prev + 1);
 
