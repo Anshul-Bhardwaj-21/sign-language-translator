@@ -3,9 +3,11 @@
 @tailwind utilities;
 
 @layer base {
-  
   body {
-    @apply bg-navy-950 text-white antialiased;
+    background-color: #0B1120;
+    color: white;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     background-image: 
       radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
       radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
@@ -14,19 +16,20 @@
 
   /* Scrollbar styling */
   ::-webkit-scrollbar {
-    @apply w-2;
+    width: 0.5rem;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-navy-900;
+    background-color: #312e81;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-blue-600 rounded-full;
+    background-color: #2563eb;
+    border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-blue-500;
+    background-color: #3b82f6;
   }
 }
 
@@ -108,130 +111,11 @@
   }
 }
 
-/* Theme Variables */
-:root[data-theme="dark"] {
-  --bg-primary: #111827;
-  --bg-secondary: #1f2937;
-  --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-  --accent: #60a5fa;
-}
 
-:root[data-theme="light"] {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f3f4f6;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --accent: #3b82f6;
-}
 
-/* High Contrast */
-:root[data-high-contrast="true"][data-theme="dark"] {
-  --bg-primary: #000000;
-  --text-primary: #ffffff;
-}
 
-:root[data-high-contrast="true"][data-theme="light"] {
-  --bg-primary: #ffffff;
-  --text-primary: #000000;
-}
 
-/* Font Sizes */
-:root[data-font-size="normal"] {
-  font-size: 16px;
-}
 
-:root[data-font-size="large"] {
-  font-size: 18px;
-}
-
-:root[data-font-size="extra-large"] {
-  font-size: 20px;
-}
-
-/* Animations */
-@keyframes blob {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(30px, -50px) scale(1.1);
-  }
-  66% {
-    transform: translate(-20px, 20px) scale(0.9);
-  }
-}
-
-.animate-blob {
-  animation: blob 7s infinite;
-}
-
-.animation-delay-2000 {
-  animation-delay: 2s;
-}
-
-.animation-delay-4000 {
-  animation-delay: 4s;
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.6s ease-out;
-}
-
-.animate-fade-in-delay {
-  animation: fade-in 0.6s ease-out 0.2s both;
-}
-
-.animate-fade-in-delay-2 {
-  animation: fade-in 0.6s ease-out 0.4s both;
-}
-
-.animate-fade-in-delay-3 {
-  animation: fade-in 0.6s ease-out 0.6s both;
-}
-
-@keyframes slide-in-right {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
-.animate-slide-in-right {
-  animation: slide-in-right 0.3s ease-out;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--accent);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
-}
 
 /* ============================================================================
    THEME SYSTEM: CSS Variables for Dark and Light Themes
@@ -318,11 +202,6 @@
   font-size: 20px;
 }
 
-/* Smooth theme transitions */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
-
 /* ============================================================================
    PRODUCTION-GRADE ACCESSIBILITY & UX STYLES
    ============================================================================ */
@@ -399,56 +278,7 @@ video.mirror {
   transform: scaleX(-1);
 }
 
-/* ============================================================================
-   LOADING STATES: Smooth Transitions
-   ============================================================================ */
 
-.loading-spinner {
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #3b82f6;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ============================================================================
-   CAPTION ANIMATIONS: Smooth Entry/Exit
-   ============================================================================ */
-
-.caption-enter {
-  animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.caption-exit {
-  animation: slideDown 0.2s ease-in;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-}
 
 /* ============================================================================
    HIGH CONTRAST MODE: WCAG AAA Compliance
@@ -533,27 +363,7 @@ video.mirror {
   }
 }
 
-/* ============================================================================
-   CUSTOM SCROLLBAR: Better UX
-   ============================================================================ */
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #1f2937;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
-}
 
 /* ============================================================================
    ERROR STATES: Clear Visual Feedback

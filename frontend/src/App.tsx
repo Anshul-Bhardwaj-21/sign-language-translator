@@ -5,9 +5,7 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LandingPageNew from './pages/LandingPageNew'
 import DashboardNew from './pages/DashboardNew'
-import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
-import HomePage from './pages/HomePage'
 import AdminDashboard from './pages/AdminDashboard'
 import PreJoinLobby from './pages/PreJoinLobby'
 import VideoCallPage from './pages/VideoCallPage'
@@ -36,7 +34,6 @@ function App() {
               <Routes>
                 <Route path="/" element={<LandingPageNew />} />
                 <Route path="/login" element={<LoginPage />} />
-                <Route path="/home" element={<HomePage />} />
                 <Route
                   path="/dashboard"
                   element={
@@ -55,6 +52,14 @@ function App() {
                 />
                 <Route
                   path="/lobby"
+                  element={
+                    <ProtectedRoute>
+                      <PreJoinLobby />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/lobby/:roomCode"
                   element={
                     <ProtectedRoute>
                       <PreJoinLobby />

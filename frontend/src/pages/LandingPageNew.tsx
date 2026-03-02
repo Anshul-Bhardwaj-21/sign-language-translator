@@ -108,10 +108,10 @@ export default function LandingPageNew() {
             >
               <GlowButton
                 size="lg"
-                onClick={() => navigate('/home')}
+                onClick={() => navigate('/login')}
                 icon={<Video className="w-5 h-5" />}
               >
-                Start Video Call
+                Get Started
               </GlowButton>
               <GlowButton
                 size="lg"

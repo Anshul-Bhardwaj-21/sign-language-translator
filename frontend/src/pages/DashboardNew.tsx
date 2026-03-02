@@ -13,7 +13,9 @@ import {
   TrendingUp, 
   Clock,
   Zap,
-  Activity
+  Activity,
+  Plus,
+  LogIn
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
@@ -21,6 +23,8 @@ export default function DashboardNew() {
   const navigate = useNavigate();
   const { aiStatus, totalWordsRecognized, isInCall } = useApp();
   const [animatedCount, setAnimatedCount] = useState(0);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [roomCode, setRoomCode] = useState('');
 
   // Animated counter
   useEffect(() => {
@@ -59,7 +63,19 @@ export default function DashboardNew() {
   ];
 
   const handleStartCall = () => {
-    navigate('/home');
+    navigate('/lobby?create=true');
+  };
+
+  const handleJoinCall = () => {
+    setShowJoinModal(true);
+  };
+
+  const handleJoinMeeting = () => {
+    if (roomCode.trim()) {
+      navigate(`/lobby/${roomCode.trim()}`);
+      setShowJoinModal(false);
+      setRoomCode('');
+    }
   };
 
   return (
@@ -87,20 +103,38 @@ export default function DashboardNew() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
         >
-          <GlassCard className="p-8 text-center">
-            <Video className="w-16 h-16 mx-auto mb-4 text-blue-400" />
-            <h2 className="text-2xl font-bold mb-2">Start a New Call</h2>
-            <p className="text-gray-400 mb-6">
-              Connect with others using real-time sign language interpretation
-            </p>
-            <GlowButton
-              size="lg"
-              onClick={handleStartCall}
-              icon={<Video className="w-5 h-5" />}
-            >
-              Launch Video Call
-            </GlowButton>
-          </GlassCard>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <GlassCard className="p-8 text-center">
+              <Plus className="w-16 h-16 mx-auto mb-4 text-blue-400" />
+              <h2 className="text-2xl font-bold mb-2">Create New Meeting</h2>
+              <p className="text-gray-400 mb-6">
+                Start an instant meeting with auto-generated room code
+              </p>
+              <GlowButton
+                size="lg"
+                onClick={handleStartCall}
+                icon={<Plus className="w-5 h-5" />}
+              >
+                Create Meeting
+              </GlowButton>
+            </GlassCard>
+
+            <GlassCard className="p-8 text-center">
+              <LogIn className="w-16 h-16 mx-auto mb-4 text-green-400" />
+              <h2 className="text-2xl font-bold mb-2">Join Existing Meeting</h2>
+              <p className="text-gray-400 mb-6">
+                Enter a room code to join an ongoing meeting
+              </p>
+              <GlowButton
+                size="lg"
+                variant="secondary"
+                onClick={handleJoinCall}
+                icon={<LogIn className="w-5 h-5" />}
+              >
+                Join Meeting
+              </GlowButton>
+            </GlassCard>
+          </div>
         </motion.div>
 
         {/* Stats Grid */}
@@ -261,6 +295,47 @@ export default function DashboardNew() {
             </div>
           </GlassCard>
         </motion.div>
+
+        {/* Join Meeting Modal */}
+        {showJoinModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-navy-900/90 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl max-w-md w-full p-8"
+            >
+              <h3 className="text-2xl font-bold mb-4">Join Meeting</h3>
+              <p className="text-gray-400 mb-6">Enter the room code to join an existing meeting</p>
+              <input
+                type="text"
+                placeholder="Enter room code (e.g., ABC123)"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                onKeyPress={(e) => e.key === 'Enter' && handleJoinMeeting()}
+                className="w-full px-4 py-3 bg-navy-800 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowJoinModal(false);
+                    setRoomCode('');
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleJoinMeeting}
+                  disabled={!roomCode.trim()}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Join
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     </div>
   );

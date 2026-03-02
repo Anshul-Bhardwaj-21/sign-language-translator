@@ -1,14 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { Video, User, Accessibility, Camera, CameraOff, AlertCircle, Plus } from 'lucide-react';
 
 export default function PreJoinLobby() {
   const { roomCode: urlRoomCode } = useParams<{ roomCode: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
-  // FIX #1: Use exact session_state field names as specified
-  const [room_code, setRoom_code] = useState(urlRoomCode || '');
-  const [display_name, setDisplay_name] = useState('');
+  // Get room code from URL params or query params
+  const initialRoomCode = urlRoomCode || searchParams.get('room') || '';
+  
+  // Form state
+  const [room_code, setRoom_code] = useState(initialRoomCode);
+  const [display_name, setDisplay_name] = useState(user?.name || '');
   const [accessibility_mode, setAccessibility_mode] = useState(false);
   const [camera_preview_granted, setCamera_preview_granted] = useState(false);
   
@@ -17,15 +24,61 @@ export default function PreJoinLobby() {
   const [cameraError, setCameraError] = useState<string>('');
   const [isJoining, setIsJoining] = useState(false);
   const [isLoadingCamera, setIsLoadingCamera] = useState(false);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [roomNotFound, setRoomNotFound] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const initializingRef = useRef(false);
 
-  // FIX #2: Validate inputs in real-time to enable/disable Join button
-  const isRoomCodeValid = room_code.trim().length >= 3; // Minimum length validation
-  const isDisplayNameValid = display_name.trim().length >= 1; // Required field
+  // Validation
+  const isRoomCodeValid = room_code.trim().length >= 3;
+  const isDisplayNameValid = display_name.trim().length >= 1;
   const canJoin = isRoomCodeValid && isDisplayNameValid && !isJoining;
 
-  // FIX #3: Handle camera preview toggle - only for preview, NOT for meeting
+  // Auto-generate room code if "Create Meeting" was clicked
+  useEffect(() => {
+    const shouldCreateRoom = searchParams.get('create') === 'true';
+    if (shouldCreateRoom && !room_code) {
+      handleCreateRoom();
+    }
+  }, []);
+
+  // Create new room
+  const handleCreateRoom = async () => {
+    setIsCreatingRoom(true);
+    setRoomNotFound(false);
+    try {
+      const userId = user?.id || `user_${Date.now()}`;
+      const response = await api.createRoom(userId, accessibility_mode);
+      setRoom_code(response.room_code);
+      setIsCreatingRoom(false);
+    } catch (error) {
+      console.error('Failed to create room:', error);
+      alert('Failed to create room. Please check if backend server is running.');
+      setIsCreatingRoom(false);
+    }
+  };
+
+  // Create room with specific code
+  const handleCreateRoomWithCode = async () => {
+    if (!room_code.trim()) return;
+    
+    setIsCreatingRoom(true);
+    setRoomNotFound(false);
+    try {
+      const userId = user?.id || `user_${Date.now()}`;
+      const response = await api.createRoom(userId, accessibility_mode);
+      // Use the entered code instead of generated one
+      setRoom_code(room_code.toUpperCase());
+      setIsCreatingRoom(false);
+    } catch (error) {
+      console.error('Failed to create room:', error);
+      alert('Failed to create room. Please try again.');
+      setIsCreatingRoom(false);
+    }
+  };
+
+  // Camera toggle
   const handleCameraToggle = async () => {
     if (camera_preview_granted && cameraStream) {
       // Turn OFF camera preview
@@ -34,7 +87,15 @@ export default function PreJoinLobby() {
       setCamera_preview_granted(false);
       setCameraError('');
     } else {
-      // Turn ON camera preview - request permission
+      // Prevent concurrent initialization attempts
+      if (initializingRef.current) {
+        console.log('Camera initialization already in progress');
+        return;
+      }
+      
+      initializingRef.current = true;
+      
+      // Turn ON camera preview
       setIsLoadingCamera(true);
       setCameraError('');
       
@@ -45,18 +106,66 @@ export default function PreJoinLobby() {
             height: { ideal: 480 },
             facingMode: 'user'
           },
-          audio: false // Preview only needs video
+          audio: false
         });
+        
+        // Verify stream tracks are active
+        const tracks = stream.getTracks();
+        if (tracks.length === 0) {
+          throw new Error('No tracks found in MediaStream');
+        }
+        
+        const videoTrack = tracks.find(track => track.kind === 'video');
+        if (!videoTrack || videoTrack.readyState !== 'live') {
+          throw new Error('Video track is not in live state');
+        }
+        
+        console.log('MediaStream obtained with', tracks.length, 'tracks, video track state:', videoTrack.readyState);
         
         setCameraStream(stream);
         setCamera_preview_granted(true);
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+          
+          // Wait for video element to be ready before playing
+          await new Promise<void>((resolve) => {
+            if (videoRef.current) {
+              console.log('Setting onloadedmetadata handler');
+              videoRef.current.onloadedmetadata = () => {
+                console.log('Video metadata loaded');
+                resolve();
+              };
+            } else {
+              console.log('videoRef.current is null, resolving immediately');
+              resolve();
+            }
+          });
+          
+          console.log('After waiting for metadata, videoRef.current:', videoRef.current ? 'exists' : 'null');
+          
+          // Call play() with proper error handling
+          if (videoRef.current) {
+            try {
+              console.log('Calling play()');
+              await videoRef.current.play();
+              console.log('Video playback started successfully');
+            } catch (playError: any) {
+              console.error('Video play() failed:', playError);
+              
+              if (playError.name === 'NotAllowedError') {
+                throw new Error('Video playback not allowed. Please check browser permissions.');
+              } else if (playError.name === 'NotSupportedError') {
+                throw new Error('Video playback not supported by this browser.');
+              } else {
+                throw new Error(`Video playback failed: ${playError.message}`);
+              }
+            }
+          } else {
+            console.log('videoRef.current is null, skipping play()');
+          }
         }
       } catch (err: any) {
-        // FIX #4: Provide friendly error messages for camera permission denial
         let errorMessage = 'Could not access camera. ';
         
         if (err.name === 'NotAllowedError') {
@@ -66,45 +175,53 @@ export default function PreJoinLobby() {
         } else if (err.name === 'NotReadableError') {
           errorMessage = 'Camera is in use by another application. Please close other apps using the camera.';
         } else {
-          errorMessage = 'Camera access failed. Please check your camera settings.';
+          errorMessage = err.message || 'Camera access failed. Please check your camera settings.';
         }
         
         setCameraError(errorMessage);
         setCamera_preview_granted(false);
+        
+        // Clean up stream if it was created
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(track => track.stop());
+          setCameraStream(null);
+        }
       } finally {
         setIsLoadingCamera(false);
+        initializingRef.current = false;
       }
     }
   };
 
-  // FIX #5: Handle join meeting - store session state and navigate
+  // Join meeting
   const handleJoin = async () => {
     if (!canJoin) return;
     
     setIsJoining(true);
+    setRoomNotFound(false);
     
     try {
-      // FIX #6: Validate room exists before joining
+      // Validate room exists
       const roomValidation = await api.validateRoom(room_code);
       if (!roomValidation.valid) {
-        alert('Room not found. Please check the room code.');
+        setRoomNotFound(true);
         setIsJoining(false);
         return;
       }
       
-      // FIX #7: Clean up camera preview before navigation (camera will restart in meeting if needed)
+      // Clean up camera preview
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
       }
       
-      // FIX #8: Store session state with exact field names and navigate
+      // Store session state and navigate
       const sessionState = {
         room_code,
         display_name,
         accessibility_mode,
-        camera_preview_granted, // This indicates user granted camera permission in lobby
-        displayName: display_name, // For compatibility with VideoCallPage
-        cameraEnabled: false, // Camera does NOT start until after join
+        camera_preview_granted,
+        displayName: display_name,
+        cameraEnabled: camera_preview_granted,
         micEnabled: true,
         accessibilityMode: accessibility_mode
       };
@@ -112,12 +229,12 @@ export default function PreJoinLobby() {
       navigate(`/call/${room_code}`, { state: sessionState });
     } catch (error) {
       console.error('Failed to join meeting:', error);
-      alert('Failed to join meeting. Please try again.');
+      setRoomNotFound(true);
       setIsJoining(false);
     }
   };
 
-  // FIX #9: Cleanup camera on component unmount
+  // Cleanup camera on unmount
   useEffect(() => {
     return () => {
       if (cameraStream) {
@@ -127,86 +244,126 @@ export default function PreJoinLobby() {
   }, [cameraStream]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-meet-dark p-8">
-      <div className="max-w-md w-full bg-meet-gray rounded-lg shadow-xl p-8">
-        {/* FIX #10: Clean header matching the ASCII layout */}
+    <div className="flex items-center justify-center min-h-screen bg-navy-950 p-8">
+      <div className="max-w-md w-full bg-navy-900/50 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8">
+        {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-white mb-2">Meeting Lobby</h1>
+          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+            <Video className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Meeting Lobby</h1>
+          <p className="text-gray-400 text-sm">Prepare to join your meeting</p>
         </div>
 
-        {/* FIX #11: Room Code input at top as specified */}
+        {/* Room Code */}
         <div className="mb-6">
           <label htmlFor="room_code" className="block text-white text-sm font-medium mb-2">
-            Room Code:
+            Room Code
           </label>
-          <input
-            id="room_code"
-            type="text"
-            value={room_code}
-            onChange={(e) => setRoom_code(e.target.value)}
-            placeholder="Enter room code"
-            className={`w-full px-4 py-3 bg-gray-700 text-white rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
-              room_code && !isRoomCodeValid 
-                ? 'border-red-500 focus:ring-red-400' 
-                : 'border-gray-600 focus:ring-blue-400'
-            }`}
-            maxLength={20}
-            required
-          />
+          <div className="flex gap-2">
+            <input
+              id="room_code"
+              type="text"
+              value={room_code}
+              onChange={(e) => {
+                setRoom_code(e.target.value.toUpperCase());
+                setRoomNotFound(false);
+              }}
+              placeholder="Enter room code"
+              className={`flex-1 px-4 py-3 bg-navy-800 text-white rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
+                room_code && !isRoomCodeValid 
+                  ? 'border-red-500 focus:ring-red-400' 
+                  : roomNotFound
+                  ? 'border-yellow-500 focus:ring-yellow-400'
+                  : 'border-white/10 focus:ring-blue-400'
+              }`}
+              maxLength={20}
+              required
+              disabled={isCreatingRoom}
+            />
+            <button
+              onClick={handleCreateRoom}
+              disabled={isCreatingRoom || room_code.length > 0}
+              className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Generate new room code"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
           {room_code && !isRoomCodeValid && (
-            <div className="mt-2 text-red-400 text-sm">
+            <div className="mt-2 text-red-400 text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
               Room code must be at least 3 characters
             </div>
           )}
-        </div>
-
-        {/* FIX #12: Name input as specified */}
-        <div className="mb-6">
-          <label htmlFor="display_name" className="block text-white text-sm font-medium mb-2">
-            Name:
-          </label>
-          <input
-            id="display_name"
-            type="text"
-            value={display_name}
-            onChange={(e) => setDisplay_name(e.target.value)}
-            placeholder="Enter your name"
-            className={`w-full px-4 py-3 bg-gray-700 text-white rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
-              display_name && !isDisplayNameValid 
-                ? 'border-red-500 focus:ring-red-400' 
-                : 'border-gray-600 focus:ring-blue-400'
-            }`}
-            maxLength={50}
-            required
-          />
-          {display_name && !isDisplayNameValid && (
-            <div className="mt-2 text-red-400 text-sm">
-              Please enter your name
+          {roomNotFound && (
+            <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
+              <div className="text-yellow-200 text-sm mb-2 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Room not found
+              </div>
+              <button
+                onClick={handleCreateRoomWithCode}
+                disabled={isCreatingRoom}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Create room with this code
+              </button>
+            </div>
+          )}
+          {isCreatingRoom && (
+            <div className="mt-2 text-blue-400 text-sm">
+              Creating new room...
             </div>
           )}
         </div>
 
-        {/* FIX #13: Clear Accessibility toggle as specified */}
+        {/* Name */}
         <div className="mb-6">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <span className="text-white text-sm font-medium">Accessibility:</span>
+          <label htmlFor="display_name" className="block text-white text-sm font-medium mb-2">
+            Your Name
+          </label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              id="display_name"
+              type="text"
+              value={display_name}
+              onChange={(e) => setDisplay_name(e.target.value)}
+              placeholder="Enter your name"
+              className={`w-full pl-12 pr-4 py-3 bg-navy-800 text-white rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
+                display_name && !isDisplayNameValid 
+                  ? 'border-red-500 focus:ring-red-400' 
+                  : 'border-white/10 focus:ring-blue-400'
+              }`}
+              maxLength={50}
+              required
+            />
+          </div>
+        </div>
+
+        {/* Accessibility */}
+        <div className="mb-6">
+          <label className="flex items-center gap-3 cursor-pointer p-4 bg-navy-800 rounded-lg hover:bg-navy-700 transition-colors">
             <input
               type="checkbox"
               checked={accessibility_mode}
               onChange={(e) => setAccessibility_mode(e.target.checked)}
               className="w-5 h-5 focus:ring-2 focus:ring-purple-400"
             />
-            <span className="text-gray-300 text-sm">
-              {accessibility_mode ? 'Enabled' : 'Disabled'}
-            </span>
+            <div className="flex-1">
+              <span className="text-white text-sm font-medium block">Sign Language Mode</span>
+              <span className="text-gray-400 text-xs">Enable real-time ASL translation</span>
+            </div>
+            <Accessibility className={`w-6 h-6 ${accessibility_mode ? 'text-purple-400' : 'text-gray-400'}`} />
           </label>
         </div>
 
-        {/* FIX #14: Camera Preview section as specified */}
+        {/* Camera Preview */}
         <div className="mb-6">
-          <div className="text-white text-sm font-medium mb-2">Camera Preview:</div>
+          <div className="text-white text-sm font-medium mb-2">Camera Preview</div>
           
-          {/* Video preview window */}
           <div className="aspect-video bg-black rounded-lg overflow-hidden relative mb-3">
             {camera_preview_granted && cameraStream ? (
               <video
@@ -215,12 +372,12 @@ export default function PreJoinLobby() {
                 playsInline
                 muted
                 className="w-full h-full object-cover"
-                style={{ transform: 'scaleX(-1)' }} // Mirror effect
+                style={{ transform: 'scaleX(-1)' }}
               />
             ) : (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <div className="text-4xl mb-2">📷</div>
+                  <Camera className="w-12 h-12 mx-auto mb-2 text-gray-400" />
                   <div className="text-gray-400 text-sm">
                     {isLoadingCamera ? 'Starting camera...' : 'Camera preview off'}
                   </div>
@@ -229,44 +386,48 @@ export default function PreJoinLobby() {
             )}
           </div>
           
-          {/* Camera toggle button */}
           <button
             onClick={handleCameraToggle}
             disabled={isLoadingCamera}
-            className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 focus:ring-2 focus:ring-blue-400 disabled:opacity-50 text-sm"
+            className="w-full px-4 py-2 bg-navy-800 text-white rounded-lg hover:bg-navy-700 focus:ring-2 focus:ring-blue-400 disabled:opacity-50 transition-colors text-sm flex items-center justify-center gap-2"
           >
+            {camera_preview_granted ? <CameraOff className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
             {isLoadingCamera ? 'Starting camera...' : 
              camera_preview_granted ? 'Turn off camera preview' : 'Turn on camera preview'}
           </button>
           
-          {/* FIX #15: Friendly camera error messages */}
           {cameraError && (
-            <div className="mt-3 p-3 bg-yellow-900 border border-yellow-700 rounded-lg">
-              <div className="text-yellow-200 text-sm">{cameraError}</div>
+            <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
+              <div className="text-yellow-200 text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {cameraError}
+              </div>
               <div className="text-yellow-300 text-xs mt-2">
-                💡 Tip: Check browser permissions or close other apps using the camera
+                Tip: Check browser permissions or close other apps using the camera
               </div>
             </div>
           )}
         </div>
 
-        {/* FIX #16: Join button disabled until valid as specified */}
+        {/* Join Button */}
         <button
           onClick={handleJoin}
           disabled={!canJoin}
-          className={`w-full px-6 py-4 text-lg font-semibold rounded-lg transition-colors ${
+          className={`w-full px-6 py-4 text-lg font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${
             canJoin
-              ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-400'
+              ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 focus:ring-4 focus:ring-blue-400 shadow-neon-blue'
               : 'bg-gray-600 text-gray-400 cursor-not-allowed'
           }`}
         >
+          <Video className="w-5 h-5" />
           {isJoining ? 'Joining Meeting...' : 'JOIN MEETING'}
         </button>
         
-        {/* Helper text */}
-        <div className="mt-4 text-center text-gray-400 text-xs">
-          {!canJoin && 'Please fill in all required fields to join'}
-        </div>
+        {!canJoin && (
+          <div className="mt-4 text-center text-gray-400 text-xs">
+            Please fill in all required fields to join
+          </div>
+        )}
       </div>
     </div>
   );

@@ -18,6 +18,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FrameCaptureManager } from '../services/FrameCaptureManager';
 import { MLResult } from '../services/api';
+import { 
+  User, Activity, Hand, Circle, Settings, Camera, CameraOff,
+  Mic, MicOff, Accessibility, Play, Pause, Trash2, Volume2, Phone,
+  Video
+} from 'lucide-react';
 
 // Types for better type safety
 interface LocationState {
@@ -116,11 +121,65 @@ export default function VideoCallPage() {
     for (const constraint of constraints) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraint);
+        
+        // Verify stream tracks are active and ready
+        const tracks = stream.getTracks();
+        if (tracks.length === 0) {
+          console.log('Camera stream has no tracks');
+          continue;
+        }
+        
+        const videoTrack = tracks.find(track => track.kind === 'video');
+        if (!videoTrack || videoTrack.readyState !== 'live') {
+          console.log('Camera video track not ready:', videoTrack?.readyState);
+          continue;
+        }
+        
+        console.log('MediaStream obtained with', tracks.length, 'tracks, video track state:', videoTrack.readyState);
+        
         setLocalStream(stream);
         
+        // Verify video element exists and is mounted before operations
         if (localVideoRef.current) {
+          // Set the stream as the video source
           localVideoRef.current.srcObject = stream;
-          await localVideoRef.current.play();
+          
+          // Wait for video metadata to load before playing
+          await new Promise<void>((resolve, reject) => {
+            const videoElement = localVideoRef.current;
+            if (!videoElement) {
+              reject(new Error('Video element no longer available'));
+              return;
+            }
+            
+            const onLoadedMetadata = () => {
+              videoElement.removeEventListener('loadedmetadata', onLoadedMetadata);
+              resolve();
+            };
+            
+            // If metadata is already loaded, resolve immediately
+            if (videoElement.readyState >= 1) {
+              resolve();
+            } else {
+              videoElement.addEventListener('loadedmetadata', onLoadedMetadata);
+            }
+          });
+          
+          // Play the video with proper error handling
+          try {
+            await localVideoRef.current.play();
+          } catch (playErr) {
+            console.error('Video play() failed:', playErr);
+            
+            if (playErr instanceof Error) {
+              if (playErr.name === 'NotAllowedError') {
+                throw new Error('Camera preview requires user interaction to play');
+              } else if (playErr.name === 'NotSupportedError') {
+                throw new Error('Camera preview not supported by browser');
+              }
+            }
+            throw playErr;
+          }
         }
         
         setIsLoadingCamera(false);
@@ -179,19 +238,22 @@ export default function VideoCallPage() {
   }, [cameraEnabled, cleanupCamera]);
 
   /**
-   * FIX #4: Initialize camera when enabled
+   * FIX #4: Initialize camera when enabled - with proper dependency management
    */
   useEffect(() => {
-    if (cameraEnabled) {
+    if (cameraEnabled && !initializingRef.current) {
       initializeCamera();
     }
     
+    // Cleanup on unmount - stop any active streams
     return () => {
-      if (cameraEnabled) {
-        cleanupCamera();
+      // Use ref to get current stream to avoid stale closure
+      if (localVideoRef.current?.srcObject) {
+        const stream = localVideoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [cameraEnabled, initializeCamera, cleanupCamera]);
+  }, [cameraEnabled, initializeCamera]); // Include initializeCamera in dependencies
 
   /**
    * FIX #5: Initialize audio separately
@@ -451,17 +513,24 @@ export default function VideoCallPage() {
   }, [handleToggleMic, handleToggleCamera, handleToggleAccessibility, handlePause, handleClear, handleSpeak, handleConfirmCaption, currentCaption]);
 
   /**
-   * FIX #17: Cleanup on unmount
+   * FIX #17: Cleanup on unmount - no dependencies to avoid issues
    */
   useEffect(() => {
     return () => {
-      cleanupCamera();
+      // Cleanup camera
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+      // Cleanup ML processing
       if (frameCaptureManagerRef.current) {
         frameCaptureManagerRef.current.stopProcessing();
       }
-      speechSynthesis.cancel();
+      // Cleanup speech
+      if (typeof speechSynthesis !== 'undefined') {
+        speechSynthesis.cancel();
+      }
     };
-  }, [cleanupCamera]);
+  }, []); // Empty deps - only run on unmount
 
   return (
     <div className="flex flex-col h-screen bg-meet-dark">
@@ -472,31 +541,37 @@ export default function VideoCallPage() {
         aria-label="Meeting status"
       >
         <div className="flex gap-6 text-sm text-gray-300">
-          <span aria-label={`Participant: ${displayName}`}>
-            👤 {displayName}
+          <span aria-label={`Participant: ${displayName}`} className="flex items-center gap-2">
+            <User className="w-4 h-4" />
+            {displayName}
           </span>
-          <span aria-label={`Frame rate: ${fps.toFixed(1)} frames per second`}>
-            📊 FPS: {fps.toFixed(1)}
+          <span aria-label={`Frame rate: ${fps.toFixed(1)} frames per second`} className="flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            FPS: {fps.toFixed(1)}
           </span>
-          <span aria-label={handDetected ? 'Hand detected' : 'No hand detected'}>
-            {handDetected ? '✋ Hand Detected' : '👋 No Hand'}
+          <span aria-label={handDetected ? 'Hand detected' : 'No hand detected'} className="flex items-center gap-2">
+            <Hand className={`w-4 h-4 ${handDetected ? 'text-green-400' : ''}`} />
+            {handDetected ? 'Hand Detected' : 'No Hand'}
           </span>
-          <span aria-label={gestureStable ? 'Gesture is stable' : 'Hand is moving'}>
-            {gestureStable ? '🔵 Stable' : '⚪ Moving'}
+          <span aria-label={gestureStable ? 'Gesture is stable' : 'Hand is moving'} className="flex items-center gap-2">
+            <Circle className={`w-4 h-4 ${gestureStable ? 'text-blue-400 fill-blue-400' : ''}`} />
+            {gestureStable ? 'Stable' : 'Moving'}
           </span>
           {mlProcessing && (
-            <span className="text-blue-400" aria-label="Processing gesture">
-              ⚙️ Processing...
+            <span className="text-blue-400 flex items-center gap-2" aria-label="Processing gesture">
+              <Settings className="w-4 h-4 animate-spin" />
+              Processing...
             </span>
           )}
         </div>
         {accessibilityMode && (
           <div 
-            className="bg-purple-600 px-4 py-1 rounded-full text-white text-sm font-semibold"
+            className="bg-purple-600 px-4 py-1 rounded-full text-white text-sm font-semibold flex items-center gap-2"
             role="status"
             aria-live="polite"
           >
-            🧏 Accessibility Mode Active
+            <Accessibility className="w-4 h-4" />
+            Accessibility Mode Active
           </div>
         )}
       </div>
@@ -546,7 +621,7 @@ export default function VideoCallPage() {
           ) : !cameraError && (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <div className="text-8xl mb-4">📷</div>
+                <Camera className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                 <div className="text-gray-400 text-xl">Camera is off</div>
                 <button
                   onClick={handleToggleCamera}
@@ -636,7 +711,7 @@ export default function VideoCallPage() {
             aria-label={micEnabled ? 'Mute microphone (M)' : 'Unmute microphone (M)'}
             title={micEnabled ? 'Mute (M)' : 'Unmute (M)'}
           >
-            <span aria-hidden="true">{micEnabled ? '🎤' : '🔇'}</span>
+            <span aria-hidden="true">{micEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}</span>
           </button>
 
           {/* Camera */}
@@ -651,7 +726,7 @@ export default function VideoCallPage() {
             aria-label={cameraEnabled ? 'Turn off camera (V)' : 'Turn on camera (V)'}
             title={cameraEnabled ? 'Turn off camera (V)' : 'Turn on camera (V)'}
           >
-            <span aria-hidden="true">{cameraEnabled ? '📹' : '📷'}</span>
+            <span aria-hidden="true">{cameraEnabled ? <Video className="w-6 h-6" /> : <CameraOff className="w-6 h-6" />}</span>
           </button>
 
           {/* Accessibility Mode */}
@@ -665,7 +740,7 @@ export default function VideoCallPage() {
             aria-label={accessibilityMode ? 'Disable accessibility mode (A)' : 'Enable accessibility mode (A)'}
             title={accessibilityMode ? 'Disable accessibility (A)' : 'Enable accessibility (A)'}
           >
-            <span aria-hidden="true">🧏</span>
+            <span aria-hidden="true"><Accessibility className="w-6 h-6" /></span>
           </button>
 
           {/* Pause/Resume */}
@@ -676,7 +751,7 @@ export default function VideoCallPage() {
             aria-label={isPaused ? 'Resume gesture detection (P)' : 'Pause gesture detection (P)'}
             title={isPaused ? 'Resume (P)' : 'Pause (P)'}
           >
-            <span aria-hidden="true">{isPaused ? '▶️' : '⏸️'}</span>
+            <span aria-hidden="true">{isPaused ? <Play className="w-6 h-6" /> : <Pause className="w-6 h-6" />}</span>
           </button>
 
           {/* Clear Captions */}
@@ -687,7 +762,7 @@ export default function VideoCallPage() {
             aria-label="Clear all captions (Ctrl+C)"
             title="Clear captions (Ctrl+C)"
           >
-            <span aria-hidden="true">🗑️</span>
+            <span aria-hidden="true"><Trash2 className="w-6 h-6" /></span>
           </button>
 
           {/* Speak Captions */}
@@ -698,7 +773,7 @@ export default function VideoCallPage() {
             aria-label="Speak captions aloud (Ctrl+S)"
             title="Speak (Ctrl+S)"
           >
-            <span aria-hidden="true">🔊</span>
+            <span aria-hidden="true"><Volume2 className="w-6 h-6" /></span>
           </button>
 
           {/* Leave Call */}
@@ -708,7 +783,7 @@ export default function VideoCallPage() {
             aria-label="Leave call"
             title="Leave call"
           >
-            <span aria-hidden="true">📞</span>
+            <span aria-hidden="true"><Phone className="w-6 h-6 transform rotate-135" /></span>
           </button>
         </div>
 

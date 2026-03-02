@@ -52,13 +52,12 @@ const HomePage: React.FC = () => {
     }));
 
   const handleCreateMeeting = () => {
-    const code = generateMeetingCode();
-    navigate(`/lobby?room=${code}`);
+    navigate('/lobby?create=true');
   };
 
   const handleJoinMeeting = () => {
     if (roomCode.trim()) {
-      navigate(`/lobby?room=${roomCode.trim()}`);
+      navigate(`/lobby/${roomCode.trim()}`);
       setShowJoinModal(false);
     }
   };
@@ -131,7 +130,7 @@ const HomePage: React.FC = () => {
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Welcome back, {user?.name}! 👋
+            Welcome back, {user?.name}!
           </h2>
           <p className="text-gray-600 dark:text-gray-400">
             Ready to start your next meeting?
