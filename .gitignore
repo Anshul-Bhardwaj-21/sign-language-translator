@@ -92,3 +92,16 @@ DISCREPANCIES.txt
 
 
 .kiro/
+
+# Additional ignores for advanced meeting features
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/coverage/
+backend/.env
+frontend/.env
+docker-compose.override.yml
+storage/
+recordings/
+mlruns/

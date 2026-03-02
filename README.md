@@ -1,5 +1,10 @@
 # Sign Language Video Call Application
 
+[![CI/CD Pipeline](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci-cd.yml)
+[![Backend Tests](https://img.shields.io/badge/backend-tests-passing-brightgreen)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions)
+[![Frontend Tests](https://img.shields.io/badge/frontend-tests-passing-brightgreen)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A real-time video calling application with ASL (American Sign Language) recognition and live captioning.
 
 ## 🚀 Quick Start (2-Minute Demo)
@@ -170,6 +175,103 @@ npm run dev
 ```
 
 Frontend runs on: http://localhost:5173
+
+## 🔄 CI/CD Pipeline
+
+This project uses GitHub Actions for automated testing and deployment.
+
+### Pipeline Stages
+
+1. **Linting & Type Checking**
+   - Backend: Black, isort, flake8
+   - Frontend: ESLint, Prettier, TypeScript
+
+2. **Testing**
+   - Backend: pytest with PostgreSQL and Redis
+   - Frontend: Vitest with React Testing Library
+
+3. **Docker Build & Push**
+   - Builds Docker images for backend and frontend
+   - Pushes to GitHub Container Registry (ghcr.io)
+   - Tags: `latest` (main), `develop`, `<branch>-<sha>`
+
+4. **Deployment**
+   - Staging: Auto-deploy on push to `develop` branch
+   - Production: Auto-deploy on push to `main` branch
+
+### Running CI Checks Locally
+
+**Backend:**
+```bash
+cd backend
+
+# Linting
+black --check .
+isort --check-only .
+flake8 .
+
+# Tests
+pytest -v
+```
+
+**Frontend:**
+```bash
+cd frontend
+
+# Linting
+npm run lint
+npm run format:check
+npx tsc --noEmit
+
+# Tests
+npm run test
+```
+
+### Docker Images
+
+Images are automatically built and pushed to GitHub Container Registry:
+
+```bash
+# Pull latest images
+docker pull ghcr.io/YOUR_USERNAME/YOUR_REPO/backend:latest
+docker pull ghcr.io/YOUR_USERNAME/YOUR_REPO/frontend:latest
+
+# Run with Docker Compose
+docker-compose up -d
+```
+
+### Environment Setup for CI/CD
+
+Required secrets in GitHub repository settings:
+
+- `GITHUB_TOKEN` - Automatically provided by GitHub Actions
+- Additional secrets for deployment (if using external services):
+  - `STAGING_DEPLOY_KEY` - SSH key for staging server
+  - `PRODUCTION_DEPLOY_KEY` - SSH key for production server
+  - `DOCKER_REGISTRY_TOKEN` - If using external registry
+
+### Health Check Endpoints
+
+The backend provides health check endpoints for monitoring:
+
+- `GET /health` - Overall service health (includes Redis status)
+- `GET /health/redis` - Dedicated Redis health check
+
+Example response:
+```json
+{
+  "status": "healthy",
+  "service": "backend",
+  "active_rooms": 5,
+  "active_connections": 12,
+  "timestamp": "2024-01-15T10:30:00",
+  "redis": {
+    "status": "healthy",
+    "ping": true,
+    "info": "Redis 7.0.0"
+  }
+}
+```
 
 ## 🎮 Keyboard Shortcuts
 

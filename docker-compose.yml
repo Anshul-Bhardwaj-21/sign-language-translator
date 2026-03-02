@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: meeting-postgres
+    environment:
+      POSTGRES_DB: meeting_db
+      POSTGRES_USER: meeting_user
+      POSTGRES_PASSWORD: meeting_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meeting_user -d meeting_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: meeting-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: meeting-backend
+    environment:
+      - DATABASE_URL=postgresql://meeting_user:meeting_pass@postgres:5432/meeting_db
+      - REDIS_URL=redis://redis:6379
+      - PORT=8001
+      - HOST=0.0.0.0
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      - LOG_LEVEL=INFO
+      - FEATURE_USE_MOCK_MODEL=1
+      - FEATURE_ENABLE_TTS=1
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend:/app
+      - ./ml:/ml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn simple_server:app --host 0.0.0.0 --port 8001 --reload
+
+  # Frontend (React + Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: meeting-frontend
+    environment:
+      - VITE_API_URL=http://localhost:8001
+      - VITE_WS_URL=ws://localhost:8001
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  postgres_data:
+  redis_data:

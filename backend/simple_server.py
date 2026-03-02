@@ -23,6 +23,9 @@ import uvicorn
 # Import mock inference
 from mock_inference import create_mock_model, create_mock_text_generator
 
+# Import Redis client
+from redis_client import get_redis_client, close_redis_client
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -171,6 +174,29 @@ text_generators: Dict[str, any] = {}
 
 
 # ============================================================================
+# Lifecycle Events
+# ============================================================================
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup."""
+    logger.info("Starting up backend service...")
+    # Initialize Redis client
+    redis_client = get_redis_client()
+    redis_health = redis_client.health_check()
+    logger.info(f"Redis connection status: {redis_health['status']}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    logger.info("Shutting down backend service...")
+    # Close Redis connections
+    close_redis_client()
+    logger.info("Redis connections closed")
+
+
+# ============================================================================
 # HTTP Endpoints
 # ============================================================================
 
@@ -186,12 +212,39 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    """
+    Comprehensive health check including Redis connectivity.
+    
+    Returns:
+        Health status for backend service and Redis
+    """
+    # Get Redis client and check health
+    redis_client = get_redis_client()
+    redis_health = redis_client.health_check()
+    
+    # Overall health status
+    overall_status = "healthy" if redis_health["status"] == "healthy" else "degraded"
+    
     return {
-        "status": "healthy",
+        "status": overall_status,
+        "service": "backend",
         "active_rooms": len(room_manager.rooms),
         "active_connections": sum(len(conns) for conns in connection_manager.active_connections.values()),
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "redis": redis_health,
     }
+
+
+@app.get("/health/redis")
+async def redis_health_check():
+    """
+    Dedicated Redis health check endpoint.
+    
+    Returns:
+        Detailed Redis health information
+    """
+    redis_client = get_redis_client()
+    return redis_client.health_check()
 
 
 @app.post("/api/rooms/create")
