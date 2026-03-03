@@ -1,101 +1,107 @@
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { io, Socket } from 'socket.io-client';
 
 type MessageHandler = (data: any) => void;
 
 interface WebSocketContextType {
   isConnected: boolean;
-  sendMessage: (message: any) => void;
-  subscribe: (type: string, handler: MessageHandler) => () => void;
+  socket: Socket | null;
+  sendMessage: (event: string, data: any) => void;
+  subscribe: (event: string, handler: MessageHandler) => () => void;
   connect: (roomCode: string, userId: string) => void;
   disconnect: () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8001';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8001';
 
 export const WebSocketProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const handlersRef = useRef<Map<string, Set<MessageHandler>>>(new Map());
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const connect = (roomCode: string, userId: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    if (socketRef.current?.connected) {
       return;
     }
 
-    const ws = new WebSocket(`${WS_URL}/ws/${roomCode}/${userId}`);
+    // Create Socket.IO connection
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      query: {
+        roomCode,
+        userId,
+      },
+    });
 
-    ws.onopen = () => {
-      console.log('WebSocket connected');
+    socket.on('connect', () => {
+      console.log('Socket.IO connected');
       setIsConnected(true);
-    };
+    });
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        const handlers = handlersRef.current.get(data.type);
-        if (handlers) {
-          handlers.forEach(handler => handler(data));
-        }
-      } catch (error) {
-        console.error('WebSocket message parse error:', error);
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
+    socket.on('disconnect', (reason) => {
+      console.log('Socket.IO disconnected:', reason);
       setIsConnected(false);
-      
-      // Auto-reconnect after 3 seconds
-      reconnectTimeoutRef.current = setTimeout(() => {
-        if (roomCode && userId) {
-          connect(roomCode, userId);
-        }
-      }, 3000);
-    };
+    });
 
-    wsRef.current = ws;
+    socket.on('connect_error', (error) => {
+      console.error('Socket.IO connection error:', error);
+    });
+
+    // Setup event handlers
+    handlersRef.current.forEach((handlers, event) => {
+      handlers.forEach(handler => {
+        socket.on(event, handler);
+      });
+    });
+
+    socketRef.current = socket;
   };
 
   const disconnect = () => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
     }
     setIsConnected(false);
   };
 
-  const sendMessage = (message: any) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message));
+  const sendMessage = (event: string, data: any) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit(event, data);
     } else {
-      console.warn('WebSocket not connected, message not sent:', message);
+      console.warn('Socket.IO not connected, message not sent:', event, data);
     }
   };
 
-  const subscribe = (type: string, handler: MessageHandler) => {
-    if (!handlersRef.current.has(type)) {
-      handlersRef.current.set(type, new Set());
+  const subscribe = (event: string, handler: MessageHandler) => {
+    if (!handlersRef.current.has(event)) {
+      handlersRef.current.set(event, new Set());
     }
-    handlersRef.current.get(type)!.add(handler);
+    handlersRef.current.get(event)!.add(handler);
+
+    // Register handler with socket if already connected
+    if (socketRef.current?.connected) {
+      socketRef.current.on(event, handler);
+    }
 
     // Return unsubscribe function
     return () => {
-      const handlers = handlersRef.current.get(type);
+      const handlers = handlersRef.current.get(event);
       if (handlers) {
         handlers.delete(handler);
         if (handlers.size === 0) {
-          handlersRef.current.delete(type);
+          handlersRef.current.delete(event);
         }
+      }
+      // Remove handler from socket
+      if (socketRef.current) {
+        socketRef.current.off(event, handler);
       }
     };
   };
@@ -108,6 +114,7 @@ export const WebSocketProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const value: WebSocketContextType = {
     isConnected,
+    socket: socketRef.current,
     sendMessage,
     subscribe,
     connect,

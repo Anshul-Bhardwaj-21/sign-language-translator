@@ -35,7 +35,6 @@ export default function VideoCallPageNew() {
   const [accessibilityMode, setAccessibilityMode] = useState(state.accessibilityMode || false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [isLoadingCamera, setIsLoadingCamera] = useState(false);
-export default function VideoCallPageNew() {seState<string>('');
   const [handDetected, setHandDetected] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [detectionQuality, setDetectionQuality] = useState<DetectionQuality>({
@@ -403,7 +402,3 @@ export default function VideoCallPageNew() {seState<string>('');
     </div>
   );
 }
-
-
-
-export default VideoCallPageNew;

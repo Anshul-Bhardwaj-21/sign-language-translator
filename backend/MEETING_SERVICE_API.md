@@ -7,7 +7,12 @@ The Meeting Service provides REST API endpoints for managing video conference me
 **Base URL**: `http://localhost:8002`
 
 **Requirements Implemented**:
+- 15.1: Host can mute individual participants
+- 15.2: Host can mute all participants (via individual mute calls)
+- 15.3: Host can disable video for individual participants
+- 15.4: Host can remove participants from meeting
 - 15.6: Host can lock meeting to prevent new participants
+- 15.8: Mute action applied within 1 second
 - 16.2: Waiting room for participant approval
 - 25.1: Create meeting with configuration
 - 25.2: Join/leave meeting functionality
@@ -259,6 +264,172 @@ Lock or unlock a meeting to control participant access. Only the host can perfor
 
 ---
 
+## Participant Management
+
+### Get Participants
+
+#### GET /api/meetings/{meeting_id}/participants
+
+Get list of all participants in a meeting (including those who have left).
+
+**Path Parameters**:
+- `meeting_id` (UUID): Meeting identifier
+
+**Response** (200 OK):
+```json
+[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174002",
+    "meeting_id": "123e4567-e89b-12d3-a456-426614174000",
+    "user_id": "123e4567-e89b-12d3-a456-426614174001",
+    "joined_at": "2024-01-01T12:05:00.000000",
+    "left_at": null,
+    "is_host": true,
+    "is_co_host": false,
+    "audio_enabled": true,
+    "video_enabled": true
+  },
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174003",
+    "meeting_id": "123e4567-e89b-12d3-a456-426614174000",
+    "user_id": "123e4567-e89b-12d3-a456-426614174004",
+    "joined_at": "2024-01-01T12:06:00.000000",
+    "left_at": null,
+    "is_host": false,
+    "is_co_host": false,
+    "audio_enabled": true,
+    "video_enabled": true
+  }
+]
+```
+
+**Error Responses**:
+- 400: Invalid meeting ID format
+- 404: Meeting not found
+
+---
+
+### Mute/Unmute Participant
+
+#### POST /api/meetings/{meeting_id}/participants/{user_id}/mute
+
+Mute or unmute a participant's audio. Only the host or co-host can perform this action.
+
+**Path Parameters**:
+- `meeting_id` (UUID): Meeting identifier
+- `user_id` (UUID): Participant user identifier
+
+**Request Body**:
+```json
+{
+  "host_id": "123e4567-e89b-12d3-a456-426614174001",
+  "muted": true
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "meeting_id": "123e4567-e89b-12d3-a456-426614174000",
+  "user_id": "123e4567-e89b-12d3-a456-426614174004",
+  "audio_enabled": false,
+  "message": "Participant muted successfully"
+}
+```
+
+**Business Rules**:
+- Only host or co-host can mute participants
+- Cannot mute participants in ended meetings
+- Mute action is applied within 1 second (Requirement 15.8)
+
+**Error Responses**:
+- 400: Invalid meeting ID, user ID, or meeting has ended
+- 403: User is not the host or co-host
+- 404: Meeting or participant not found
+
+---
+
+### Remove Participant
+
+#### POST /api/meetings/{meeting_id}/participants/{user_id}/remove
+
+Remove a participant from the meeting. Only the host or co-host can perform this action.
+
+**Path Parameters**:
+- `meeting_id` (UUID): Meeting identifier
+- `user_id` (UUID): Participant user identifier
+
+**Request Body**:
+```json
+{
+  "host_id": "123e4567-e89b-12d3-a456-426614174001"
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "meeting_id": "123e4567-e89b-12d3-a456-426614174000",
+  "user_id": "123e4567-e89b-12d3-a456-426614174004",
+  "message": "Participant removed successfully"
+}
+```
+
+**Business Rules**:
+- Only host or co-host can remove participants
+- Cannot remove the host from the meeting
+- Cannot remove participants from ended meetings
+- Removed participant's `left_at` timestamp is set
+
+**Error Responses**:
+- 400: Invalid meeting ID, user ID, meeting has ended, or attempting to remove host
+- 403: User is not the host or co-host
+- 404: Meeting or participant not found
+
+---
+
+### Update Participant Video
+
+#### PUT /api/meetings/{meeting_id}/participants/{user_id}/video
+
+Enable or disable a participant's video. Only the host or co-host can perform this action.
+
+**Path Parameters**:
+- `meeting_id` (UUID): Meeting identifier
+- `user_id` (UUID): Participant user identifier
+
+**Request Body**:
+```json
+{
+  "host_id": "123e4567-e89b-12d3-a456-426614174001",
+  "video_enabled": false
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "meeting_id": "123e4567-e89b-12d3-a456-426614174000",
+  "user_id": "123e4567-e89b-12d3-a456-426614174004",
+  "video_enabled": false,
+  "message": "Participant video disabled successfully"
+}
+```
+
+**Business Rules**:
+- Only host or co-host can control participant video
+- Cannot control video in ended meetings
+
+**Error Responses**:
+- 400: Invalid meeting ID, user ID, or meeting has ended
+- 403: User is not the host or co-host
+- 404: Meeting or participant not found
+
+---
+
 ## Error Response Format
 
 All error responses follow this format:
@@ -354,7 +525,6 @@ The service uses the following tables:
 
 Future enhancements (from tasks.md):
 - Task 2.2: Unit tests for Meeting Service
-- Task 2.3: Participant management endpoints (mute, remove, video control)
 - Task 2.4: JWT authentication service
 - Task 2.5: Property tests for authentication
 

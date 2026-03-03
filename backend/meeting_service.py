@@ -91,6 +91,36 @@ class LockMeetingRequest(BaseModel):
     host_id: str
 
 
+class ParticipantResponse(BaseModel):
+    """Response model for participant data."""
+    id: str
+    meeting_id: str
+    user_id: str
+    joined_at: str
+    left_at: Optional[str] = None
+    is_host: bool
+    is_co_host: bool
+    audio_enabled: bool
+    video_enabled: bool
+
+
+class MuteParticipantRequest(BaseModel):
+    """Request model for muting a participant."""
+    host_id: str
+    muted: bool = True
+
+
+class RemoveParticipantRequest(BaseModel):
+    """Request model for removing a participant."""
+    host_id: str
+
+
+class UpdateVideoRequest(BaseModel):
+    """Request model for updating participant video status."""
+    host_id: str
+    video_enabled: bool
+
+
 class ErrorResponse(BaseModel):
     """Standard error response."""
     error: str
@@ -708,6 +738,406 @@ async def lock_meeting(meeting_id: str, request: LockMeetingRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update meeting lock status"
+        )
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
+
+
+@app.get("/api/meetings/{meeting_id}/participants", response_model=list[ParticipantResponse])
+async def get_participants(meeting_id: str):
+    """
+    Get list of all participants in a meeting.
+    
+    Requirements: 15.1
+    """
+    conn = None
+    try:
+        # Validate UUID format
+        try:
+            UUID(meeting_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid meeting ID format"
+            )
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if meeting exists
+        cursor.execute("SELECT id FROM meetings WHERE id = %s", (meeting_id,))
+        meeting = cursor.fetchone()
+        
+        if not meeting:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meeting not found"
+            )
+        
+        # Get all participants (including those who left)
+        cursor.execute("""
+            SELECT id, meeting_id, user_id, joined_at, left_at,
+                   is_host, is_co_host, audio_enabled, video_enabled
+            FROM participants
+            WHERE meeting_id = %s
+            ORDER BY joined_at ASC
+        """, (meeting_id,))
+        
+        participants = cursor.fetchall()
+        
+        return [
+            ParticipantResponse(
+                id=str(p['id']),
+                meeting_id=str(p['meeting_id']),
+                user_id=str(p['user_id']),
+                joined_at=p['joined_at'].isoformat(),
+                left_at=p['left_at'].isoformat() if p['left_at'] else None,
+                is_host=p['is_host'],
+                is_co_host=p['is_co_host'],
+                audio_enabled=p['audio_enabled'],
+                video_enabled=p['video_enabled']
+            )
+            for p in participants
+        ]
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting participants for meeting {meeting_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve participants"
+        )
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
+
+
+@app.post("/api/meetings/{meeting_id}/participants/{user_id}/mute")
+async def mute_participant(meeting_id: str, user_id: str, request: MuteParticipantRequest):
+    """
+    Mute or unmute a participant (host only).
+    
+    Requirements: 15.1, 15.8
+    """
+    conn = None
+    try:
+        # Validate UUID formats
+        try:
+            UUID(meeting_id)
+            UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid meeting ID or user ID format"
+            )
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if meeting exists and verify host
+        cursor.execute("""
+            SELECT id, host_id, ended_at
+            FROM meetings
+            WHERE id = %s
+        """, (meeting_id,))
+        
+        meeting = cursor.fetchone()
+        
+        if not meeting:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meeting not found"
+            )
+        
+        if meeting['ended_at']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Meeting has ended"
+            )
+        
+        # Verify host or co-host authorization
+        cursor.execute("""
+            SELECT is_host, is_co_host
+            FROM participants
+            WHERE meeting_id = %s AND user_id = %s AND left_at IS NULL
+        """, (meeting_id, request.host_id))
+        
+        requester = cursor.fetchone()
+        
+        if not requester or (not requester['is_host'] and not requester['is_co_host']):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the host or co-host can mute participants"
+            )
+        
+        # Check if target participant exists in meeting
+        cursor.execute("""
+            SELECT id FROM participants
+            WHERE meeting_id = %s AND user_id = %s AND left_at IS NULL
+        """, (meeting_id, user_id))
+        
+        participant = cursor.fetchone()
+        
+        if not participant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Participant not found in meeting"
+            )
+        
+        # Update participant audio status
+        cursor.execute("""
+            UPDATE participants
+            SET audio_enabled = %s
+            WHERE meeting_id = %s AND user_id = %s AND left_at IS NULL
+        """, (not request.muted, meeting_id, user_id))
+        
+        conn.commit()
+        
+        action = "muted" if request.muted else "unmuted"
+        logger.info(f"Participant {user_id} {action} in meeting {meeting_id} by {request.host_id}")
+        
+        return {
+            "success": True,
+            "meeting_id": meeting_id,
+            "user_id": user_id,
+            "audio_enabled": not request.muted,
+            "message": f"Participant {action} successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Database error muting participant {user_id} in meeting {meeting_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to mute participant"
+        )
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
+
+
+@app.post("/api/meetings/{meeting_id}/participants/{user_id}/remove")
+async def remove_participant(meeting_id: str, user_id: str, request: RemoveParticipantRequest):
+    """
+    Remove a participant from the meeting (host only).
+    
+    Requirements: 15.4
+    """
+    conn = None
+    try:
+        # Validate UUID formats
+        try:
+            UUID(meeting_id)
+            UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid meeting ID or user ID format"
+            )
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if meeting exists and verify host
+        cursor.execute("""
+            SELECT id, host_id, ended_at
+            FROM meetings
+            WHERE id = %s
+        """, (meeting_id,))
+        
+        meeting = cursor.fetchone()
+        
+        if not meeting:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meeting not found"
+            )
+        
+        if meeting['ended_at']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Meeting has ended"
+            )
+        
+        # Verify host or co-host authorization
+        cursor.execute("""
+            SELECT is_host, is_co_host
+            FROM participants
+            WHERE meeting_id = %s AND user_id = %s AND left_at IS NULL
+        """, (meeting_id, request.host_id))
+        
+        requester = cursor.fetchone()
+        
+        if not requester or (not requester['is_host'] and not requester['is_co_host']):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the host or co-host can remove participants"
+            )
+        
+        # Check if target participant exists in meeting
+        cursor.execute("""
+            SELECT id, is_host FROM participants
+            WHERE meeting_id = %s AND user_id = %s AND left_at IS NULL
+        """, (meeting_id, user_id))
+        
+        participant = cursor.fetchone()
+        
+        if not participant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Participant not found in meeting"
+            )
+        
+        # Prevent removing the host
+        if participant['is_host']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot remove the host from the meeting"
+            )
+        
+        # Remove participant by setting left_at timestamp
+        cursor.execute("""
+            UPDATE participants
+            SET left_at = %s
+            WHERE meeting_id = %s AND user_id = %s AND left_at IS NULL
+        """, (datetime.now(timezone.utc), meeting_id, user_id))
+        
+        conn.commit()
+        
+        logger.info(f"Participant {user_id} removed from meeting {meeting_id} by {request.host_id}")
+        
+        return {
+            "success": True,
+            "meeting_id": meeting_id,
+            "user_id": user_id,
+            "message": "Participant removed successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Database error removing participant {user_id} from meeting {meeting_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to remove participant"
+        )
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
+
+
+@app.put("/api/meetings/{meeting_id}/participants/{user_id}/video")
+async def update_participant_video(meeting_id: str, user_id: str, request: UpdateVideoRequest):
+    """
+    Enable or disable video for a participant (host only).
+    
+    Requirements: 15.3
+    """
+    conn = None
+    try:
+        # Validate UUID formats
+        try:
+            UUID(meeting_id)
+            UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid meeting ID or user ID format"
+            )
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if meeting exists and verify host
+        cursor.execute("""
+            SELECT id, host_id, ended_at
+            FROM meetings
+            WHERE id = %s
+        """, (meeting_id,))
+        
+        meeting = cursor.fetchone()
+        
+        if not meeting:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meeting not found"
+            )
+        
+        if meeting['ended_at']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Meeting has ended"
+            )
+        
+        # Verify host or co-host authorization
+        cursor.execute("""
+            SELECT is_host, is_co_host
+            FROM participants
+            WHERE meeting_id = %s AND user_id = %s AND left_at IS NULL
+        """, (meeting_id, request.host_id))
+        
+        requester = cursor.fetchone()
+        
+        if not requester or (not requester['is_host'] and not requester['is_co_host']):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the host or co-host can control participant video"
+            )
+        
+        # Check if target participant exists in meeting
+        cursor.execute("""
+            SELECT id FROM participants
+            WHERE meeting_id = %s AND user_id = %s AND left_at IS NULL
+        """, (meeting_id, user_id))
+        
+        participant = cursor.fetchone()
+        
+        if not participant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Participant not found in meeting"
+            )
+        
+        # Update participant video status
+        cursor.execute("""
+            UPDATE participants
+            SET video_enabled = %s
+            WHERE meeting_id = %s AND user_id = %s AND left_at IS NULL
+        """, (request.video_enabled, meeting_id, user_id))
+        
+        conn.commit()
+        
+        action = "enabled" if request.video_enabled else "disabled"
+        logger.info(f"Participant {user_id} video {action} in meeting {meeting_id} by {request.host_id}")
+        
+        return {
+            "success": True,
+            "meeting_id": meeting_id,
+            "user_id": user_id,
+            "video_enabled": request.video_enabled,
+            "message": f"Participant video {action} successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Database error updating video for participant {user_id} in meeting {meeting_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update participant video"
         )
     finally:
         if conn:

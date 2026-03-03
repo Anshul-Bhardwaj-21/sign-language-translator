@@ -9,6 +9,7 @@ CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
     created_at TIMESTAMP DEFAULT NOW(),
     settings JSONB DEFAULT '{}'::jsonb
 );
@@ -75,6 +76,17 @@ CREATE TABLE sign_language_captions (
     model_version VARCHAR(50) NOT NULL
 );
 
+-- Chat messages table
+CREATE TABLE chat_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    meeting_id UUID REFERENCES meetings(id) ON DELETE CASCADE,
+    sender_id UUID REFERENCES users(id),
+    recipient_id UUID REFERENCES users(id),  -- NULL for public messages
+    message_text TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT NOW(),
+    is_private BOOLEAN DEFAULT FALSE
+);
+
 -- ML experiments table (MLflow integration)
 CREATE TABLE ml_experiments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -131,6 +143,7 @@ CREATE TABLE analytics_events (
 );
 
 -- Indexes for performance
+CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_meetings_host_id ON meetings(host_id);
 CREATE INDEX idx_participants_meeting_id ON participants(meeting_id);
 CREATE INDEX idx_participants_user_id ON participants(user_id);
@@ -138,6 +151,8 @@ CREATE INDEX idx_recordings_meeting_id ON recordings(meeting_id);
 CREATE INDEX idx_transcripts_recording_id ON transcripts(recording_id);
 CREATE INDEX idx_sign_language_captions_meeting_id ON sign_language_captions(meeting_id);
 CREATE INDEX idx_sign_language_captions_timestamp ON sign_language_captions(timestamp);
+CREATE INDEX idx_chat_messages_meeting_id ON chat_messages(meeting_id);
+CREATE INDEX idx_chat_messages_timestamp ON chat_messages(timestamp);
 CREATE INDEX idx_ml_runs_experiment_id ON ml_runs(experiment_id);
 CREATE INDEX idx_model_versions_deployment_status ON model_versions(deployment_status);
 CREATE INDEX idx_drift_metrics_model_version_id ON drift_metrics(model_version_id);
