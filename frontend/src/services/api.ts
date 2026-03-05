@@ -1,5 +1,23 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
+// Logging utility
+const log = {
+  info: (message: string, ...args: any[]) => {
+    console.log(`[API] ${message}`, ...args);
+  },
+  error: (message: string, ...args: any[]) => {
+    console.error(`[API ERROR] ${message}`, ...args);
+  },
+  warn: (message: string, ...args: any[]) => {
+    console.warn(`[API WARNING] ${message}`, ...args);
+  },
+  debug: (message: string, ...args: any[]) => {
+    if (import.meta.env.DEV) {
+      console.debug(`[API DEBUG] ${message}`, ...args);
+    }
+  },
+};
+
 export interface RoomCreateResponse {
   room_code: string;
   room_id: string;
@@ -31,51 +49,89 @@ export interface MLResult {
 
 export const api = {
   async createRoom(hostUserId: string, accessibilityMode: boolean = false): Promise<RoomCreateResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/rooms/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        host_user_id: hostUserId,
-        accessibility_mode: accessibilityMode,
-        max_participants: 10
-      })
-    });
+    log.info('Creating room', { hostUserId, accessibilityMode });
     
-    if (!response.ok) {
-      throw new Error(`Failed to create room: ${response.statusText}`);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host_user_id: hostUserId,
+          accessibility_mode: accessibilityMode,
+          max_participants: 10
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error('Failed to create room', { status: response.status, error: errorText });
+        throw new Error(`Failed to create room: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      log.info('Room created successfully', data);
+      return data;
+    } catch (error) {
+      log.error('Create room error', error);
+      throw error;
     }
-    
-    return response.json();
   },
 
   async validateRoom(roomCode: string): Promise<RoomValidateResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/rooms/${roomCode}/validate`);
+    log.info('Validating room', { roomCode });
     
-    if (!response.ok) {
-      throw new Error(`Failed to validate room: ${response.statusText}`);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${roomCode}/validate`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error('Failed to validate room', { status: response.status, error: errorText });
+        throw new Error(`Failed to validate room: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      log.info('Room validation result', data);
+      return data;
+    } catch (error) {
+      log.error('Validate room error', error);
+      throw error;
     }
-    
-    return response.json();
   },
 
   async joinRoom(roomCode: string, userId: string, userName: string) {
-    const response = await fetch(`${API_BASE_URL}/api/rooms/${roomCode}/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, user_name: userName })
-    });
+    log.info('Joining room', { roomCode, userId, userName });
     
-    if (!response.ok) {
-      throw new Error(`Failed to join room: ${response.statusText}`);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${roomCode}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, user_name: userName })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error('Failed to join room', { status: response.status, error: errorText });
+        throw new Error(`Failed to join room: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      log.info('Joined room successfully', data);
+      return data;
+    } catch (error) {
+      log.error('Join room error', error);
+      throw error;
     }
-    
-    return response.json();
   },
 
   async processFrame(frame: string, userId: string, sessionId: string): Promise<MLResult> {
+    log.debug('Processing frame', { userId, sessionId, frameLength: frame.length });
+    
     // Manual timeout implementation for browser compatibility
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => {
+      log.warn('Frame processing timeout');
+      controller.abort();
+    }, 5000);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/ml/process-frame`, {
@@ -90,17 +146,24 @@ export const api = {
         signal: controller.signal
       });
 
-      clearTimeout(timeoutId);  // Clear timeout on success
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
+        log.error('Frame processing failed', { status: response.status });
         throw new Error(`HTTP ${response.status}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      log.debug('Frame processed successfully', { 
+        gesture: data.gesture, 
+        confidence: data.confidence,
+        handDetected: data.hand_detected 
+      });
+      return data;
     } catch (error) {
-      clearTimeout(timeoutId);  // Clear timeout on error
+      clearTimeout(timeoutId);
       
-      console.error('ML processing failed:', error);
+      log.error('ML processing failed', error);
       return {
         success: false,
         hand_detected: false,

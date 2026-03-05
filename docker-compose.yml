@@ -34,6 +34,33 @@ services:
       timeout: 5s
       retries: 5
 
+  # MLflow Tracking Server
+  mlflow:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: meeting-mlflow
+    environment:
+      - BACKEND_STORE_URI=postgresql://meeting_user:meeting_pass@postgres:5432/meeting_db
+      - ARTIFACT_ROOT=/mlflow-artifacts
+      - MLFLOW_HOST=0.0.0.0
+      - MLFLOW_PORT=5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - mlflow_artifacts:/mlflow-artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://meeting_user:meeting_pass@postgres:5432/meeting_db
+      --default-artifact-root /mlflow-artifacts
+      --host 0.0.0.0
+      --port 5000
+      --workers 2
+
   # Backend API (FastAPI)
   backend:
     build:
@@ -82,3 +109,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  mlflow_artifacts:

@@ -45,16 +45,19 @@ export default function PreJoinLobby() {
 
   // Create new room
   const handleCreateRoom = async () => {
+    console.log('[PreJoinLobby] Creating new room');
     setIsCreatingRoom(true);
     setRoomNotFound(false);
     try {
       const userId = user?.id || `user_${Date.now()}`;
+      console.log('[PreJoinLobby] Calling API to create room', { userId, accessibility_mode });
       const response = await api.createRoom(userId, accessibility_mode);
+      console.log('[PreJoinLobby] Room created successfully', response);
       setRoom_code(response.room_code);
       setIsCreatingRoom(false);
     } catch (error) {
-      console.error('Failed to create room:', error);
-      alert('Failed to create room. Please check if backend server is running.');
+      console.error('[PreJoinLobby] Failed to create room:', error);
+      alert('Failed to create room. Please check if backend server is running at http://localhost:8001');
       setIsCreatingRoom(false);
     }
   };
@@ -63,16 +66,19 @@ export default function PreJoinLobby() {
   const handleCreateRoomWithCode = async () => {
     if (!room_code.trim()) return;
     
+    console.log('[PreJoinLobby] Creating room with specific code', { room_code });
     setIsCreatingRoom(true);
     setRoomNotFound(false);
     try {
       const userId = user?.id || `user_${Date.now()}`;
+      console.log('[PreJoinLobby] Calling API to create room with code');
       const response = await api.createRoom(userId, accessibility_mode);
       // Use the entered code instead of generated one
+      console.log('[PreJoinLobby] Room created, using entered code', room_code);
       setRoom_code(room_code.toUpperCase());
       setIsCreatingRoom(false);
     } catch (error) {
-      console.error('Failed to create room:', error);
+      console.error('[PreJoinLobby] Failed to create room:', error);
       alert('Failed to create room. Please try again.');
       setIsCreatingRoom(false);
     }
@@ -80,26 +86,37 @@ export default function PreJoinLobby() {
 
   // Camera toggle
   const handleCameraToggle = async () => {
+    console.log('[PreJoinLobby] Camera toggle clicked', { 
+      currentState: camera_preview_granted,
+      isInitializing: initializingRef.current 
+    });
+    
     if (camera_preview_granted && cameraStream) {
       // Turn OFF camera preview
-      cameraStream.getTracks().forEach(track => track.stop());
+      console.log('[PreJoinLobby] Turning OFF camera');
+      cameraStream.getTracks().forEach(track => {
+        console.log('[PreJoinLobby] Stopping track', { kind: track.kind, id: track.id });
+        track.stop();
+      });
       setCameraStream(null);
       setCamera_preview_granted(false);
       setCameraError('');
     } else {
       // Prevent concurrent initialization attempts
       if (initializingRef.current) {
-        console.log('Camera initialization already in progress');
+        console.log('[PreJoinLobby] Camera initialization already in progress, ignoring click');
         return;
       }
       
       initializingRef.current = true;
+      console.log('[PreJoinLobby] Starting camera initialization');
       
       // Turn ON camera preview
       setIsLoadingCamera(true);
       setCameraError('');
       
       try {
+        console.log('[PreJoinLobby] Requesting camera permission');
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             width: { ideal: 640 },
@@ -111,47 +128,62 @@ export default function PreJoinLobby() {
         
         // Verify stream tracks are active
         const tracks = stream.getTracks();
+        console.log('[PreJoinLobby] MediaStream obtained', { trackCount: tracks.length });
+        
         if (tracks.length === 0) {
           throw new Error('No tracks found in MediaStream');
         }
         
         const videoTrack = tracks.find(track => track.kind === 'video');
         if (!videoTrack || videoTrack.readyState !== 'live') {
+          console.error('[PreJoinLobby] Video track not ready', { 
+            hasTrack: !!videoTrack, 
+            readyState: videoTrack?.readyState 
+          });
           throw new Error('Video track is not in live state');
         }
         
-        console.log('MediaStream obtained with', tracks.length, 'tracks, video track state:', videoTrack.readyState);
+        console.log('[PreJoinLobby] Video track is live', { 
+          id: videoTrack.id, 
+          label: videoTrack.label 
+        });
         
         setCameraStream(stream);
         setCamera_preview_granted(true);
         
         if (videoRef.current) {
+          console.log('[PreJoinLobby] Setting video element srcObject');
           videoRef.current.srcObject = stream;
           
           // Wait for video element to be ready before playing
-          await new Promise<void>((resolve) => {
+          await new Promise<void>((resolve, reject) => {
             if (videoRef.current) {
-              console.log('Setting onloadedmetadata handler');
+              console.log('[PreJoinLobby] Waiting for video metadata to load');
               videoRef.current.onloadedmetadata = () => {
-                console.log('Video metadata loaded');
+                console.log('[PreJoinLobby] Video metadata loaded');
                 resolve();
               };
+              
+              // Timeout after 5 seconds
+              setTimeout(() => {
+                console.error('[PreJoinLobby] Timeout waiting for video metadata');
+                reject(new Error('Timeout waiting for video metadata'));
+              }, 5000);
             } else {
-              console.log('videoRef.current is null, resolving immediately');
-              resolve();
+              console.error('[PreJoinLobby] videoRef.current is null');
+              reject(new Error('Video element not available'));
             }
           });
           
-          console.log('After waiting for metadata, videoRef.current:', videoRef.current ? 'exists' : 'null');
+          console.log('[PreJoinLobby] Attempting to play video');
           
           // Call play() with proper error handling
           if (videoRef.current) {
             try {
-              console.log('Calling play()');
               await videoRef.current.play();
-              console.log('Video playback started successfully');
+              console.log('[PreJoinLobby] Video playback started successfully');
             } catch (playError: any) {
-              console.error('Video play() failed:', playError);
+              console.error('[PreJoinLobby] Video play() failed:', playError);
               
               if (playError.name === 'NotAllowedError') {
                 throw new Error('Video playback not allowed. Please check browser permissions.');
@@ -162,10 +194,14 @@ export default function PreJoinLobby() {
               }
             }
           } else {
-            console.log('videoRef.current is null, skipping play()');
+            console.warn('[PreJoinLobby] videoRef.current is null after metadata load');
           }
+        } else {
+          console.warn('[PreJoinLobby] videoRef.current is null, cannot set srcObject');
         }
       } catch (err: any) {
+        console.error('[PreJoinLobby] Camera initialization error:', err);
+        
         let errorMessage = 'Could not access camera. ';
         
         if (err.name === 'NotAllowedError') {
@@ -178,15 +214,18 @@ export default function PreJoinLobby() {
           errorMessage = err.message || 'Camera access failed. Please check your camera settings.';
         }
         
+        console.error('[PreJoinLobby] Setting error message:', errorMessage);
         setCameraError(errorMessage);
         setCamera_preview_granted(false);
         
         // Clean up stream if it was created
         if (cameraStream) {
+          console.log('[PreJoinLobby] Cleaning up failed stream');
           cameraStream.getTracks().forEach(track => track.stop());
           setCameraStream(null);
         }
       } finally {
+        console.log('[PreJoinLobby] Camera initialization complete');
         setIsLoadingCamera(false);
         initializingRef.current = false;
       }
@@ -197,13 +236,18 @@ export default function PreJoinLobby() {
   const handleJoin = async () => {
     if (!canJoin) return;
     
+    console.log('[PreJoinLobby] Joining meeting', { room_code, display_name });
     setIsJoining(true);
     setRoomNotFound(false);
     
     try {
       // Validate room exists
+      console.log('[PreJoinLobby] Validating room');
       const roomValidation = await api.validateRoom(room_code);
+      console.log('[PreJoinLobby] Room validation result', roomValidation);
+      
       if (!roomValidation.valid) {
+        console.warn('[PreJoinLobby] Room not found');
         setRoomNotFound(true);
         setIsJoining(false);
         return;
@@ -211,6 +255,7 @@ export default function PreJoinLobby() {
       
       // Clean up camera preview
       if (cameraStream) {
+        console.log('[PreJoinLobby] Cleaning up camera preview before joining');
         cameraStream.getTracks().forEach(track => track.stop());
       }
       
@@ -226,9 +271,10 @@ export default function PreJoinLobby() {
         accessibilityMode: accessibility_mode
       };
       
+      console.log('[PreJoinLobby] Navigating to call page', sessionState);
       navigate(`/call/${room_code}`, { state: sessionState });
     } catch (error) {
-      console.error('Failed to join meeting:', error);
+      console.error('[PreJoinLobby] Failed to join meeting:', error);
       setRoomNotFound(true);
       setIsJoining(false);
     }

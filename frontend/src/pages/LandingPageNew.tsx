@@ -244,7 +244,7 @@ export default function LandingPageNew() {
             </p>
             <GlowButton
               size="lg"
-              onClick={() => navigate('/home')}
+              onClick={() => navigate('/dashboard')}
               icon={<Video className="w-5 h-5" />}
             >
               Launch SignBridge Now

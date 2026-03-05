@@ -4,6 +4,8 @@ import { WebSocketProvider } from './contexts/WebSocketContext'
 import { MeetingProvider } from './contexts/MeetingContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import ErrorBoundary from './components/ErrorBoundary'
+import BackendHealthCheck from './components/BackendHealthCheck'
 import LandingPageNew from './pages/LandingPageNew'
 import DashboardNew from './pages/DashboardNew'
 import LoginPage from './pages/LoginPage'
@@ -28,70 +30,73 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <AppProvider>
-      <WebSocketProvider>
-        <MeetingProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/" element={<LandingPageNew />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <ProtectedRoute>
-                        <DashboardNew />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin"
-                    element={
-                      <AdminRoute>
-                        <AdminDashboard />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/lobby"
-                    element={
-                      <ProtectedRoute>
-                        <PreJoinLobby />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/lobby/:roomCode"
-                    element={
-                      <ProtectedRoute>
-                        <PreJoinLobby />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/call/:roomCode"
-                    element={
-                      <ProtectedRoute>
-                        <VideoCallPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/meeting/:roomCode"
-                    element={
-                      <ProtectedRoute>
-                        <MeetingRoom />
-                      </ProtectedRoute>
-                    }
-                  />
-                </Routes>
-              </BrowserRouter>
-            </AuthProvider>
-          </ThemeProvider>
-        </MeetingProvider>
-      </WebSocketProvider>
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <WebSocketProvider>
+          <MeetingProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <BackendHealthCheck />
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/" element={<LandingPageNew />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route
+                      path="/dashboard"
+                      element={
+                        <ProtectedRoute>
+                          <DashboardNew />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin"
+                      element={
+                        <AdminRoute>
+                          <AdminDashboard />
+                        </AdminRoute>
+                      }
+                    />
+                    <Route
+                      path="/lobby"
+                      element={
+                        <ProtectedRoute>
+                          <PreJoinLobby />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/lobby/:roomCode"
+                      element={
+                        <ProtectedRoute>
+                          <PreJoinLobby />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/call/:roomCode"
+                      element={
+                        <ProtectedRoute>
+                          <VideoCallPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/meeting/:roomCode"
+                      element={
+                        <ProtectedRoute>
+                          <MeetingRoom />
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </BrowserRouter>
+              </AuthProvider>
+            </ThemeProvider>
+          </MeetingProvider>
+        </WebSocketProvider>
+      </AppProvider>
+    </ErrorBoundary>
   )
 }
 
