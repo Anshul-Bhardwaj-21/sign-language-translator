@@ -132,6 +132,22 @@ CREATE TABLE drift_metrics (
     metadata JSONB DEFAULT '{}'::jsonb
 );
 
+-- Prediction logs table for drift detection
+CREATE TABLE prediction_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_version_id UUID REFERENCES model_versions(id),
+    user_id UUID REFERENCES users(id),
+    meeting_id UUID REFERENCES meetings(id),
+    predicted_gesture TEXT NOT NULL,
+    confidence FLOAT NOT NULL,
+    ground_truth_gesture TEXT,
+    is_correct BOOLEAN,
+    sampled_for_evaluation BOOLEAN DEFAULT FALSE,
+    timestamp TIMESTAMP DEFAULT NOW(),
+    latency_ms FLOAT,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
 -- Analytics events table
 CREATE TABLE analytics_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -157,5 +173,8 @@ CREATE INDEX idx_ml_runs_experiment_id ON ml_runs(experiment_id);
 CREATE INDEX idx_model_versions_deployment_status ON model_versions(deployment_status);
 CREATE INDEX idx_drift_metrics_model_version_id ON drift_metrics(model_version_id);
 CREATE INDEX idx_drift_metrics_timestamp ON drift_metrics(timestamp);
+CREATE INDEX idx_prediction_logs_model_version_id ON prediction_logs(model_version_id);
+CREATE INDEX idx_prediction_logs_timestamp ON prediction_logs(timestamp);
+CREATE INDEX idx_prediction_logs_sampled ON prediction_logs(sampled_for_evaluation);
 CREATE INDEX idx_analytics_events_meeting_id ON analytics_events(meeting_id);
 CREATE INDEX idx_analytics_events_timestamp ON analytics_events(timestamp);

@@ -42,6 +42,7 @@ Author: AI-Powered Meeting Platform Team
 
 import io
 import logging
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -58,6 +59,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from models.model_registry import ModelRegistry
+from drift_detection import DriftDetectionService
 
 # Configure logging
 logging.basicConfig(
@@ -86,9 +88,11 @@ app.add_middleware(
 model_registry: Optional[ModelRegistry] = None
 production_model: Optional[torch.nn.Module] = None
 landmark_detector: Optional['HandLandmarkDetector'] = None
+drift_service: Optional[DriftDetectionService] = None
 device: str = "cpu"
 confidence_threshold: float = 0.7
 model_name: str = "sign-language-asl"
+current_model_version_id: Optional[str] = None
 
 
 # Pydantic models for request/response
@@ -219,7 +223,7 @@ def load_production_model():
     Requirements:
         - 33.12: Load models from Model_Registry on startup
     """
-    global production_model, model_registry, device
+    global production_model, model_registry, device, current_model_version_id
     
     try:
         # Initialize model registry
@@ -236,6 +240,28 @@ def load_production_model():
             stage="Production",
             device=device
         )
+        
+        # Get model version ID
+        try:
+            prod_version = model_registry.get_production_model_version(model_name)
+            if prod_version:
+                # Get the model version ID from database
+                import psycopg2
+                db_url = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/meeting_db')
+                conn = psycopg2.connect(db_url)
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id FROM model_versions WHERE model_name = %s AND version = %s",
+                    (model_name, str(prod_version.version))
+                )
+                result = cur.fetchone()
+                if result:
+                    current_model_version_id = str(result[0])
+                    logger.info(f"Current model version ID: {current_model_version_id}")
+                cur.close()
+                conn.close()
+        except Exception as e:
+            logger.warning(f"Failed to get model version ID: {e}")
         
         # Set model to evaluation mode
         production_model.eval()
@@ -357,7 +383,7 @@ async def startup_event():
     Requirements:
         - 33.12: Load models from Model_Registry on startup
     """
-    global landmark_detector
+    global landmark_detector, drift_service
     
     logger.info("Starting Sign Language Inference Service...")
     
@@ -369,6 +395,14 @@ async def startup_event():
         logger.error(f"Failed to initialize landmark detector: {e}")
         landmark_detector = None
     
+    # Initialize drift detection service
+    try:
+        drift_service = DriftDetectionService()
+        logger.info("✓ Drift detection service initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize drift detection service: {e}")
+        drift_service = None
+    
     # Load production model
     load_production_model()
     
@@ -378,12 +412,15 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown."""
-    global landmark_detector
+    global landmark_detector, drift_service
     
     logger.info("Shutting down inference service...")
     
     if landmark_detector:
         landmark_detector.close()
+    
+    if drift_service:
+        drift_service.close()
     
     logger.info("✓ Shutdown complete")
 
@@ -486,6 +523,20 @@ async def predict(
             f"Prediction: gesture={gesture}, confidence={confidence:.3f if confidence else 0}, "
             f"latency={latency_ms:.1f}ms, user={user_id}"
         )
+        
+        # Log to drift detection service (Requirement 52.3)
+        if drift_service and current_model_version_id:
+            try:
+                drift_service.log_prediction(
+                    model_version_id=current_model_version_id,
+                    user_id=user_id,
+                    meeting_id=meeting_id,
+                    predicted_gesture=gesture if gesture else "no_prediction",
+                    confidence=confidence if confidence else 0.0,
+                    latency_ms=latency_ms
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log prediction to drift service: {e}")
         
         # Return response
         if gesture is None or confidence is None:
