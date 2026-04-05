@@ -1,0 +1,21 @@
+{
+  "admins": [
+    {
+      "id": "admin-001",
+      "email": "admin@videocall.com",
+      "password": "Admin@2024",
+      "name": "Super Admin",
+      "role": "admin",
+      "permissions": ["all"]
+    },
+    {
+      "id": "mod-001",
+      "email": "moderator@videocall.com",
+      "password": "Mod@2024",
+      "name": "Moderator",
+      "role": "moderator",
+      "permissions": ["mute_all", "remove_participant", "end_meeting", "monitor_meetings"]
+    }
+  ],
+  "note": "Admin credentials for secure meeting moderation. Change passwords in production!"
+}

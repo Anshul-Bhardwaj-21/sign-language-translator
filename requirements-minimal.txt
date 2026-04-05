@@ -1,0 +1,20 @@
+# Minimal requirements to run the Sign Language Video Call app
+# Use this if you don't need ML training features
+
+# Core UI
+streamlit>=1.32
+
+# Core ML inference
+opencv-python>=4.8
+mediapipe==0.10.32
+numpy>=1.23.0,<2.0.0  # MediaPipe requires NumPy 1.x
+
+# Text-to-speech
+pyttsx3>=2.90
+
+# Backend server (optional for basic functionality)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+python-multipart>=0.0.6
+pydantic>=2.0.0

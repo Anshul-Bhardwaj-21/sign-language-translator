@@ -1,0 +1,173 @@
+# MLflow Experiment Tracking Configuration
+# This file configures MLflow for tracking sign language model training experiments
+# Requirements: 51.9 - Setup MLflow experiment tracking
+
+# MLflow Server Configuration
+server:
+  # Tracking server URI
+  # For local development: http://localhost:5000
+  # For production: https://mlflow.your-domain.com
+  tracking_uri: "http://localhost:5000"
+  
+  # Backend store (PostgreSQL) for experiment metadata
+  backend_store_uri: "postgresql://meeting_user:meeting_pass@localhost:5432/meeting_db"
+  
+  # Artifact store (S3/GCS) for model files and plots
+  # Options: local path, s3://bucket-name, gs://bucket-name
+  artifact_root: "./backend/storage/mlflow-artifacts"
+  
+  # Server host and port
+  host: "0.0.0.0"
+  port: 5000
+  
+  # Workers for handling concurrent requests
+  workers: 2
+
+# Default Experiment Configuration
+experiments:
+  # Sign language ASL baseline experiment
+  sign_language_asl_baseline:
+    name: "sign-language-asl-baseline"
+    description: "CNN+LSTM baseline model for American Sign Language recognition (20-50 gestures, MVP)"
+    tags:
+      project: "advanced-meeting-features"
+      model_type: "cnn-lstm"
+      sign_language: "ASL"
+      phase: "mvp"
+      layer: "7-production-ml"
+  
+  # Future experiments (Phase 2)
+  sign_language_asl_transformer:
+    name: "sign-language-asl-transformer"
+    description: "Transformer model for ASL recognition (200+ gestures, Phase 2)"
+    tags:
+      project: "advanced-meeting-features"
+      model_type: "transformer"
+      sign_language: "ASL"
+      phase: "phase2"
+  
+  sign_language_bsl_baseline:
+    name: "sign-language-bsl-baseline"
+    description: "CNN+LSTM baseline model for British Sign Language recognition"
+    tags:
+      project: "advanced-meeting-features"
+      model_type: "cnn-lstm"
+      sign_language: "BSL"
+      phase: "phase2"
+
+# Model Registry Configuration
+model_registry:
+  # Registered model names
+  models:
+    - name: "sign-language-asl"
+      description: "American Sign Language recognition model"
+      tags:
+        sign_language: "ASL"
+        use_case: "real-time-video-conferencing"
+    
+    - name: "sign-language-bsl"
+      description: "British Sign Language recognition model"
+      tags:
+        sign_language: "BSL"
+        use_case: "real-time-video-conferencing"
+  
+  # Deployment stages
+  stages:
+    - "None"          # Default stage for new models
+    - "Staging"       # Models being tested
+    - "Production"    # Models deployed to production
+    - "Archived"      # Old models kept for reference
+
+# Logging Configuration
+logging:
+  # Parameters to always log (Requirement 51.1)
+  required_params:
+    - "learning_rate"
+    - "batch_size"
+    - "epochs"
+    - "optimizer"
+    - "loss_function"
+    - "dataset_hash"        # Requirement 51.2
+    - "dataset_version"
+    - "random_seed"         # Requirement 51.3
+    - "model_architecture"
+    - "num_classes"
+    - "sequence_length"
+  
+  # Metrics to log (Requirement 51.4)
+  required_metrics:
+    - "train_loss"
+    - "train_accuracy"
+    - "val_loss"
+    - "val_accuracy"
+    - "test_accuracy"
+    - "test_precision"
+    - "test_recall"
+    - "test_f1_score"
+  
+  # Artifacts to log (Requirement 51.13)
+  required_artifacts:
+    - "model"                 # Model checkpoint
+    - "confusion_matrix.png"  # Confusion matrix plot
+    - "training_curves.png"   # Training/validation curves
+    - "model_config.yaml"     # Model configuration
+    - "training_config.yaml"  # Training configuration
+  
+  # Environment info to log (Requirement 51.12)
+  environment_info:
+    - "python_version"
+    - "pytorch_version"
+    - "cuda_version"
+    - "gpu_name"
+    - "cpu_count"
+    - "memory_gb"
+
+# Experiment Cleanup (Requirement 51.14)
+cleanup:
+  enabled: true
+  retention_days: 90  # Keep experiments for 90 days
+  archive_before_delete: true
+  archive_location: "s3://ml-archives/experiments"
+
+# Cost Tracking (Requirement 51.15)
+cost_tracking:
+  enabled: true
+  gpu_cost_per_hour: 0.50  # USD per GPU hour
+  storage_cost_per_gb_month: 0.023  # USD per GB per month
+  compute_cost_per_hour: 0.10  # USD per CPU hour
+
+# Performance Requirements
+performance:
+  # Requirement 30.10: MVP accuracy target
+  mvp_accuracy_threshold: 0.85
+  
+  # Requirement 30.11: Production accuracy target
+  production_accuracy_threshold: 0.95
+  
+  # Requirement 33.4, 46.5: Inference latency target
+  max_inference_latency_ms: 200
+
+# Integration Settings
+integration:
+  # Prometheus metrics export
+  prometheus:
+    enabled: true
+    port: 9090
+  
+  # Slack notifications
+  slack:
+    enabled: false
+    webhook_url: ""
+    notify_on:
+      - "experiment_complete"
+      - "model_registered"
+      - "accuracy_threshold_met"
+  
+  # Email notifications
+  email:
+    enabled: false
+    smtp_server: ""
+    smtp_port: 587
+    from_address: ""
+    to_addresses: []
+

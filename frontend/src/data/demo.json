@@ -1,0 +1,148 @@
+{
+  "users": [
+    {
+      "id": "user-001",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "avatar": "https://ui-avatars.com/api/?name=John+Doe",
+      "isGuest": false,
+      "isAdmin": false,
+      "stats": {
+        "totalMeetings": 15,
+        "totalTime": "12h 30m",
+        "lastActive": "2024-02-16T10:30:00Z"
+      }
+    },
+    {
+      "id": "user-002",
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "avatar": "https://ui-avatars.com/api/?name=Jane+Smith",
+      "isGuest": false,
+      "isAdmin": false,
+      "stats": {
+        "totalMeetings": 8,
+        "totalTime": "6h 45m",
+        "lastActive": "2024-02-16T09:15:00Z"
+      }
+    }
+  ],
+  "meetings": [
+    {
+      "id": "meet-001",
+      "code": "ABC-123",
+      "name": "Team Standup",
+      "hostId": "user-001",
+      "hostName": "John Doe",
+      "date": "2024-02-16T09:00:00Z",
+      "duration": "45m",
+      "participants": [
+        {
+          "id": "user-001",
+          "name": "John Doe",
+          "isMuted": false,
+          "isCameraOn": true,
+          "isHandRaised": false
+        },
+        {
+          "id": "user-002",
+          "name": "Jane Smith",
+          "isMuted": false,
+          "isCameraOn": true,
+          "isHandRaised": false
+        }
+      ],
+      "status": "completed",
+      "createdAt": "2024-02-16T08:55:00Z"
+    },
+    {
+      "id": "meet-002",
+      "code": "XYZ-789",
+      "name": "Client Meeting",
+      "hostId": "user-001",
+      "hostName": "John Doe",
+      "date": "2024-02-15T14:00:00Z",
+      "duration": "1h 30m",
+      "participants": [
+        {
+          "id": "user-001",
+          "name": "John Doe",
+          "isMuted": false,
+          "isCameraOn": true,
+          "isHandRaised": false
+        }
+      ],
+      "status": "completed",
+      "createdAt": "2024-02-15T13:55:00Z"
+    },
+    {
+      "id": "meet-003",
+      "code": "DEF-456",
+      "name": "Project Review",
+      "hostId": "user-002",
+      "hostName": "Jane Smith",
+      "date": "2024-02-14T11:00:00Z",
+      "duration": "2h 15m",
+      "participants": [
+        {
+          "id": "user-002",
+          "name": "Jane Smith",
+          "isMuted": false,
+          "isCameraOn": true,
+          "isHandRaised": false
+        }
+      ],
+      "status": "completed",
+      "createdAt": "2024-02-14T10:55:00Z"
+    }
+  ],
+  "adminStats": {
+    "totalUsers": 156,
+    "totalMeetings": 342,
+    "activeMeetings": 12,
+    "totalTime": "1,245h 30m",
+    "accessibilityUsage": "38%",
+    "averageMeetingDuration": "52m",
+    "peakHours": "10:00 AM - 2:00 PM",
+    "topUsers": [
+      {
+        "id": "user-001",
+        "name": "John Doe",
+        "meetings": 15,
+        "time": "12h 30m"
+      },
+      {
+        "id": "user-002",
+        "name": "Jane Smith",
+        "meetings": 8,
+        "time": "6h 45m"
+      }
+    ]
+  },
+  "recentActivity": [
+    {
+      "id": "activity-001",
+      "type": "meeting_created",
+      "userId": "user-001",
+      "userName": "John Doe",
+      "meetingCode": "ABC-123",
+      "timestamp": "2024-02-16T08:55:00Z"
+    },
+    {
+      "id": "activity-002",
+      "type": "user_joined",
+      "userId": "user-002",
+      "userName": "Jane Smith",
+      "meetingCode": "ABC-123",
+      "timestamp": "2024-02-16T09:01:00Z"
+    },
+    {
+      "id": "activity-003",
+      "type": "meeting_ended",
+      "userId": "user-001",
+      "userName": "John Doe",
+      "meetingCode": "ABC-123",
+      "timestamp": "2024-02-16T09:45:00Z"
+    }
+  ]
+}
