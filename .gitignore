@@ -105,3 +105,15 @@ docker-compose.override.yml
 storage/
 recordings/
 mlruns/
+
+# Production env files (keep examples, ignore actuals)
+backend/.env.production
+frontend/.env.production.local
+*.env.local
+
+# Trained model artifacts (large files — use Git LFS or upload separately)
+backend/artifacts/models/local_sign_model/
+backend/artifacts/reports/
+
+# Netlify
+.netlify/

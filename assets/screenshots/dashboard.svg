@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" fill="none">
+  <rect width="1440" height="900" rx="36" fill="#08141B"/>
+  <rect x="70" y="70" width="1300" height="760" rx="32" fill="#0D2029" stroke="#254653"/>
+  <text x="110" y="130" fill="#6CD0C2" font-size="24" font-family="Segoe UI, Arial">Dashboard Preview</text>
+  <rect x="110" y="180" width="1220" height="140" rx="28" fill="#102B34"/>
+  <rect x="110" y="360" width="390" height="210" rx="24" fill="#132D38"/>
+  <rect x="525" y="360" width="390" height="210" rx="24" fill="#132D38"/>
+  <rect x="940" y="360" width="390" height="210" rx="24" fill="#132D38"/>
+  <rect x="110" y="600" width="1220" height="170" rx="24" fill="#102B34"/>
+  <text x="150" y="260" fill="#F4F8FA" font-size="48" font-family="Georgia, serif">Create, join, and monitor rooms</text>
+  <text x="150" y="710" fill="#A9C0C8" font-size="26" font-family="Segoe UI, Arial">Operational metrics, recent rooms, and backend engine status live in one view.</text>
+</svg>

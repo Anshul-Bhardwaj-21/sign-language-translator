@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" fill="none">
+  <rect width="1440" height="900" rx="36" fill="#08141B"/>
+  <rect x="60" y="60" width="1320" height="780" rx="32" fill="#0D2029" stroke="#254653"/>
+  <text x="100" y="130" fill="#6CD0C2" font-size="24" font-family="Segoe UI, Arial">Landing Page Preview</text>
+  <text x="100" y="220" fill="#F4F8FA" font-size="60" font-family="Georgia, serif">A polished first impression</text>
+  <text x="100" y="280" fill="#A9C0C8" font-size="28" font-family="Segoe UI, Arial">Startup-grade storytelling, realtime product positioning, and a clear path to action.</text>
+  <rect x="100" y="360" width="220" height="58" rx="29" fill="#6CD0C2"/>
+  <rect x="340" y="360" width="220" height="58" rx="29" fill="#173944" stroke="#295766"/>
+  <rect x="840" y="190" width="450" height="480" rx="30" fill="#102B34" stroke="#295766"/>
+  <rect x="880" y="240" width="370" height="180" rx="24" fill="#173944"/>
+  <rect x="880" y="450" width="170" height="170" rx="22" fill="#132D38"/>
+  <rect x="1080" y="450" width="170" height="170" rx="22" fill="#132D38"/>
+  <text x="100" y="800" fill="#79929B" font-size="22" font-family="Segoe UI, Arial">Placeholder art for README. Swap with an actual screenshot from the running frontend when available.</text>
+</svg>

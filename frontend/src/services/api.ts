@@ -1,180 +1,104 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+import type { HealthSnapshot, PredictionSnapshot, RoomSnapshot } from '../types/app'
 
-// Logging utility
-const log = {
-  info: (message: string, ...args: any[]) => {
-    console.log(`[API] ${message}`, ...args);
-  },
-  error: (message: string, ...args: any[]) => {
-    console.error(`[API ERROR] ${message}`, ...args);
-  },
-  warn: (message: string, ...args: any[]) => {
-    console.warn(`[API WARNING] ${message}`, ...args);
-  },
-  debug: (message: string, ...args: any[]) => {
-    if (import.meta.env.DEV) {
-      console.debug(`[API DEBUG] ${message}`, ...args);
-    }
-  },
-};
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://localhost:8001'
 
-export interface RoomCreateResponse {
-  room_code: string;
-  room_id: string;
-  created_at: number;
-  websocket_url: string;
+type ApiEnvelope<T> = {
+  success: boolean
+  message: string
+  data: T
 }
 
-export interface RoomValidateResponse {
-  valid: boolean;
-  room_id?: string;
-  participants_count?: number;
-  is_full?: boolean;
-  accessibility_mode?: boolean;
-  error?: string;
-}
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  })
 
-export interface MLResult {
-  success: boolean;
-  hand_detected: boolean;
-  landmarks?: number[][];
-  gesture: string;
-  confidence: number;
-  caption: string;
-  movement_state: string;
-  processing_time_ms: number;
-  error?: string;
-  fallback_mode?: string;
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(text || `Request failed with status ${response.status}`)
+  }
+
+  const payload = (await response.json()) as ApiEnvelope<T>
+  return payload.data
 }
 
 export const api = {
-  async createRoom(hostUserId: string, accessibilityMode: boolean = false): Promise<RoomCreateResponse> {
-    log.info('Creating room', { hostUserId, accessibilityMode });
-    
+  async getHealth() {
+    return request<HealthSnapshot>('/health')
+  },
+
+  async getIceServers(): Promise<RTCIceServer[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/rooms/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          host_user_id: hostUserId,
-          accessibility_mode: accessibilityMode,
-          max_participants: 10
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        log.error('Failed to create room', { status: response.status, error: errorText });
-        throw new Error(`Failed to create room: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      log.info('Room created successfully', data);
-      return data;
-    } catch (error) {
-      log.error('Create room error', error);
-      throw error;
+      const res = await fetch(`${API_BASE_URL}/ice-servers`)
+      if (!res.ok) throw new Error('ice-servers fetch failed')
+      const data = await res.json() as { iceServers: RTCIceServer[] }
+      return data.iceServers
+    } catch {
+      // Fallback to Google STUN if backend unreachable
+      return [{ urls: 'stun:stun.l.google.com:19302' }]
     }
   },
 
-  async validateRoom(roomCode: string): Promise<RoomValidateResponse> {
-    log.info('Validating room', { roomCode });
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/rooms/${roomCode}/validate`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        log.error('Failed to validate room', { status: response.status, error: errorText });
-        throw new Error(`Failed to validate room: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      log.info('Room validation result', data);
-      return data;
-    } catch (error) {
-      log.error('Validate room error', error);
-      throw error;
-    }
+  async createRoom(input: {
+    displayName: string
+    participantId: string
+    roomName?: string
+    accessibilityMode?: boolean
+    maxParticipants?: number
+  }) {
+    return request<RoomSnapshot>('/rooms', {
+      method: 'POST',
+      body: JSON.stringify({
+        display_name: input.displayName,
+        participant_id: input.participantId,
+        room_name: input.roomName ?? 'Live translation room',
+        accessibility_mode: input.accessibilityMode ?? true,
+        max_participants: input.maxParticipants ?? 2,
+      }),
+    })
   },
 
-  async joinRoom(roomCode: string, userId: string, userName: string) {
-    log.info('Joining room', { roomCode, userId, userName });
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/rooms/${roomCode}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, user_name: userName })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        log.error('Failed to join room', { status: response.status, error: errorText });
-        throw new Error(`Failed to join room: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      log.info('Joined room successfully', data);
-      return data;
-    } catch (error) {
-      log.error('Join room error', error);
-      throw error;
-    }
+  async joinRoom(roomId: string, input: { displayName: string; participantId: string }) {
+    return request<RoomSnapshot>(`/rooms/${roomId}/join`, {
+      method: 'POST',
+      body: JSON.stringify({
+        display_name: input.displayName,
+        participant_id: input.participantId,
+      }),
+    })
   },
 
-  async processFrame(frame: string, userId: string, sessionId: string): Promise<MLResult> {
-    log.debug('Processing frame', { userId, sessionId, frameLength: frame.length });
-    
-    // Manual timeout implementation for browser compatibility
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      log.warn('Frame processing timeout');
-      controller.abort();
-    }, 5000);
+  async getRoom(roomId: string) {
+    return request<RoomSnapshot>(`/rooms/${roomId}`)
+  },
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/ml/process-frame`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          frame,
-          user_id: userId,
-          session_id: sessionId,
-          timestamp: Date.now() / 1000
-        }),
-        signal: controller.signal
-      });
+  async predict(input: {
+    imageBase64: string
+    roomId: string
+    participantId: string
+  }) {
+    return request<PredictionSnapshot>('/predict', {
+      method: 'POST',
+      body: JSON.stringify({
+        image_base64: input.imageBase64,
+        room_id: input.roomId,
+        participant_id: input.participantId,
+        timestamp_ms: Date.now(),
+      }),
+    })
+  },
+}
 
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        log.error('Frame processing failed', { status: response.status });
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      log.debug('Frame processed successfully', { 
-        gesture: data.gesture, 
-        confidence: data.confidence,
-        handDetected: data.hand_detected 
-      });
-      return data;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      
-      log.error('ML processing failed', error);
-      return {
-        success: false,
-        hand_detected: false,
-        gesture: 'none',
-        confidence: 0,
-        caption: '',
-        movement_state: 'error',
-        processing_time_ms: 0,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        fallback_mode: 'text_only'
-      };
-    }
-  }
-};
+export function getRealtimeUrl(roomId: string, participantId: string, displayName: string) {
+  const configured = import.meta.env.VITE_WS_URL
+  const baseUrl = configured ?? API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://')
+  const params = new URLSearchParams({
+    participant_id: participantId,
+    display_name: displayName,
+  })
+  return `${baseUrl}/ws/rooms/${roomId}?${params.toString()}`
+}

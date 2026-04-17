@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" fill="none">
+  <rect width="1600" height="900" rx="40" fill="#08141B"/>
+  <circle cx="210" cy="160" r="180" fill="#0F766E" fill-opacity="0.18"/>
+  <circle cx="1360" cy="170" r="170" fill="#F97352" fill-opacity="0.18"/>
+  <rect x="80" y="80" width="1440" height="740" rx="32" fill="#0D2029" stroke="#254653"/>
+  <text x="120" y="170" fill="#6CD0C2" font-size="28" font-family="Segoe UI, Arial" letter-spacing="6">SIGNBRIDGE</text>
+  <text x="120" y="270" fill="#F4F8FA" font-size="68" font-family="Georgia, serif">Realtime sign-language communication</text>
+  <text x="120" y="340" fill="#A9C0C8" font-size="30" font-family="Segoe UI, Arial">Video rooms, live captions, chat, and a clean ML handoff path.</text>
+  <rect x="120" y="410" width="220" height="64" rx="32" fill="#6CD0C2"/>
+  <text x="175" y="452" fill="#042026" font-size="24" font-family="Segoe UI, Arial">Launch Room</text>
+  <rect x="880" y="180" width="520" height="420" rx="28" fill="#102B34" stroke="#295766"/>
+  <rect x="920" y="230" width="280" height="260" rx="24" fill="#173944"/>
+  <rect x="1220" y="230" width="140" height="120" rx="20" fill="#132D38"/>
+  <rect x="1220" y="370" width="140" height="120" rx="20" fill="#132D38"/>
+  <rect x="920" y="520" width="440" height="36" rx="18" fill="#122B35"/>
+  <text x="955" y="544" fill="#F4F8FA" font-size="18" font-family="Segoe UI, Arial">HELLO</text>
+  <text x="80" y="860" fill="#79929B" font-size="22" font-family="Segoe UI, Arial">README hero placeholder. Replace with a real product capture when available.</text>
+</svg>

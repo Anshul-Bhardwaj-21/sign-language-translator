@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600" viewBox="0 0 900 1600" fill="none">
+  <rect width="900" height="1600" rx="36" fill="#08141B"/>
+  <rect x="100" y="70" width="700" height="1460" rx="44" fill="#0D2029" stroke="#254653"/>
+  <rect x="150" y="130" width="600" height="180" rx="32" fill="#102B34"/>
+  <rect x="150" y="350" width="600" height="360" rx="32" fill="#132D38"/>
+  <rect x="150" y="740" width="600" height="240" rx="32" fill="#132D38"/>
+  <rect x="150" y="1010" width="600" height="320" rx="32" fill="#102B34"/>
+  <text x="190" y="220" fill="#F4F8FA" font-size="42" font-family="Georgia, serif">Mobile room layout</text>
+  <text x="190" y="830" fill="#A9C0C8" font-size="24" font-family="Segoe UI, Arial">Responsive stacking keeps stage, interpretation, and chat readable on narrow screens.</text>
+</svg>

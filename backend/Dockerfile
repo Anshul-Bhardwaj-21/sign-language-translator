@@ -1,25 +1,20 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+WORKDIR /workspace
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libpq-dev \
+    build-essential \
+    libgl1 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
+COPY backend/requirements.txt backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend ./backend
+COPY tests ./tests
+COPY pytest.ini ./pytest.ini
 
-# Copy application code
-COPY . .
-
-# Expose port
 EXPOSE 8001
 
-# Run the application
-CMD ["uvicorn", "simple_server:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+CMD ["python", "backend/main.py"]

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" fill="none">
+  <rect width="1440" height="900" rx="36" fill="#08141B"/>
+  <rect x="120" y="90" width="1200" height="720" rx="32" fill="#0D2029" stroke="#254653"/>
+  <text x="170" y="160" fill="#6CD0C2" font-size="24" font-family="Segoe UI, Arial">Captions / Interpretation Preview</text>
+  <rect x="170" y="210" width="490" height="150" rx="24" fill="#102B34"/>
+  <rect x="170" y="390" width="490" height="150" rx="24" fill="#102B34"/>
+  <rect x="170" y="570" width="490" height="150" rx="24" fill="#102B34"/>
+  <rect x="710" y="210" width="560" height="510" rx="28" fill="#132D38"/>
+  <text x="220" y="295" fill="#F4F8FA" font-size="40" font-family="Georgia, serif">HELLO</text>
+  <text x="220" y="475" fill="#F4F8FA" font-size="40" font-family="Georgia, serif">PLEASE</text>
+  <text x="220" y="655" fill="#F4F8FA" font-size="40" font-family="Georgia, serif">THANKS</text>
+  <text x="760" y="300" fill="#A9C0C8" font-size="30" font-family="Segoe UI, Arial">Confidence score, frame quality, caption history, and shared transcript activity are grouped here.</text>
+</svg>
